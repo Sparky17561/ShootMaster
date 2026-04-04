@@ -1,11 +1,14 @@
 import * as THREE from 'three';
+import { CONFIG } from './Config.js';
 
-let targets = [];
+export let targets = [];
 let obstacles = [];
+const _tempVec = new THREE.Vector3();
+const _zeroVec = new THREE.Vector3(0, 0, 0);
 
 export function initWorld(scene) {
     // 1. Lighting
-    const ambient = new THREE.AmbientLight(0x404040); // Soft white light
+    const ambient = new THREE.AmbientLight(0x404040); 
     scene.add(ambient);
 
     const directional = new THREE.DirectionalLight(0xffffff, 1.2);
@@ -24,12 +27,12 @@ export function initWorld(scene) {
     // 3. Boundary Walls
     const wallMaterial = new THREE.MeshStandardMaterial({ color: 0x444444 });
     const wallHeight = 10;
-    
+
     const wallGeoms = [
-        { size: [100, wallHeight, 1], pos: [0, wallHeight/2, -50] }, // Back
-        { size: [100, wallHeight, 1], pos: [0, wallHeight/2, 50] },  // Front
-        { size: [1, wallHeight, 100], pos: [-50, wallHeight/2, 0] }, // Left
-        { size: [1, wallHeight, 100], pos: [50, wallHeight/2, 0] }   // Right
+        { size: [100, wallHeight, 1], pos: [0, wallHeight / 2, -50] }, // Back
+        { size: [100, wallHeight, 1], pos: [0, wallHeight / 2, 50] },  // Front
+        { size: [1, wallHeight, 100], pos: [-50, wallHeight / 2, 0] }, // Left
+        { size: [1, wallHeight, 100], pos: [50, wallHeight / 2, 0] }   // Right
     ];
 
     wallGeoms.forEach(cfg => {
@@ -73,15 +76,18 @@ export function initWorld(scene) {
             originalColor: 0x00ff00,
             isTarget: true,
             baseScale: 1,
+            health: 100,
+            isDead: false,
+            respawnTimer: 0,
             hitTimer: 0,
-            isMoving: i < 10, // 10 moving targets
+            isMoving: i < 10, 
             moveAxis: Math.random() > 0.5 ? 'x' : 'z',
             moveDir: 1,
             moveSpeed: Math.random() * 5 + 2,
             moveRange: Math.random() * 10 + 5,
-            startPos: target.position[Math.random() > 0.5 ? 'x' : 'z'] // roughly
+            startPos: 0
         };
-        
+
         target.userData.startPos = (target.userData.moveAxis === 'x') ? target.position.x : target.position.z;
 
         scene.add(target);
@@ -89,9 +95,55 @@ export function initWorld(scene) {
     }
 }
 
+function getRandomSafePosition(playerPosition) {
+    const range = 40;
+    const minDistanceSq = CONFIG.MIN_SPAWN_DISTANCE * CONFIG.MIN_SPAWN_DISTANCE;
+    let pos = new THREE.Vector3();
+    let attempts = 0;
+
+    while (attempts < 10) {
+        pos.set(
+            (Math.random() - 0.5) * range,
+            Math.random() * 5 + 1,
+            (Math.random() - 0.5) * range
+        );
+
+        if (pos.distanceToSquared(playerPosition) > minDistanceSq) {
+            return pos;
+        }
+        attempts++;
+    }
+    return pos;
+}
+
 export function updateWorld(game, dt) {
+    const playerState = game.playerState;
+
     targets.forEach(target => {
-        // 1. Feedback Recovery (Color & Scale)
+        // 1. Death & Respawn Logic
+        if (target.userData.isDead) {
+            target.scale.lerp(_zeroVec, CONFIG.DEATH_ANIMATION_SPEED * dt);
+            
+            target.userData.respawnTimer -= dt;
+            if (target.userData.respawnTimer <= 0) {
+                const newPos = getRandomSafePosition(_tempVec.set(
+                    playerState.position.x,
+                    playerState.position.y,
+                    playerState.position.z
+                ));
+                target.position.copy(newPos);
+                target.userData.startPos = (target.userData.moveAxis === 'x') ? target.position.x : target.position.z;
+                
+                target.userData.isDead = false;
+                target.userData.health = 100;
+                target.userData.respawnTimer = 0;
+                target.material.color.set(target.userData.originalColor);
+                target.scale.setScalar(target.userData.baseScale);
+            }
+            return; 
+        }
+
+        // 2. Feedback Recovery 
         if (target.userData.hitTimer > 0) {
             target.userData.hitTimer -= dt;
             if (target.userData.hitTimer <= 0) {
@@ -99,17 +151,15 @@ export function updateWorld(game, dt) {
             }
         }
         
-        // Recover scale
         const targetScale = target.userData.baseScale;
         if (target.scale.x > targetScale) {
             const newScale = Math.max(targetScale, target.scale.x - 2 * dt);
             target.scale.setScalar(newScale);
         }
 
-        // 2. Linear Movement
+        // 3. Linear Movement
         if (target.userData.isMoving) {
             const axis = target.userData.moveAxis;
-            const currentPos = target.position[axis];
             const startPos = target.userData.startPos;
             const range = target.userData.moveRange;
             
@@ -121,4 +171,3 @@ export function updateWorld(game, dt) {
         }
     });
 }
-

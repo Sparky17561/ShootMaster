@@ -8,6 +8,7 @@
 </head>
 <body>
     <div id="game-container">
+        <div id="instruction">PAUSED<br><span>CLICK TO RESUME</span></div>
         <!-- Crosshair -->
         <div id="crosshair">
             <div class="dot"></div>
@@ -27,6 +28,8 @@
         <!-- HUD -->
         <div id="hud">
             <div id="fps-counter">FPS: 0</div>
+            <div id="player-hp">HP: 100</div>
+            <div id="score-display">SCORE: 0</div>
             <div id="speed-meter">SPD: 0</div>
             <div id="slide-status">SLD: READY</div>
             <div id="control-mode">MODE: POINTER LOCK</div>
@@ -35,8 +38,8 @@
                 <p>POS: <span id="pos-display">0, 0, 0</span></p>
                 <p>VEL: <span id="vel-display">0, 0, 0</span></p>
             </div>
-            <div id="instruction">Click to Start</div>
         </div>
+        <div id="instruction">PAUSED<br><span>CLICK TO RESUME</span></div>
     </div>
     <script type="module" src="/src/main.js"></script>
 </body>

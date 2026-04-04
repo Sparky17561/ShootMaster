@@ -32,6 +32,12 @@ export const CONFIG = {
     TRACKPAD_SMOOTHING: 0.1,
     DELTA_SPIKE_THRESHOLD: 100, // Ignore movement deltas larger than 100px
 
+    // Gameplay Loop
+    DAMAGE_PER_SHOT: 100,
+    RESPAWN_DELAY: 2.0,
+    MIN_SPAWN_DISTANCE: 15.0,
+    DEATH_ANIMATION_SPEED: 10.0,
+
     // Weapon
     FOV_BASE: 75,
     FOV_ADS: 45,

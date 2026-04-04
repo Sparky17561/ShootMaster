@@ -5,7 +5,7 @@ import { updatePhysics } from './physics.js';
 import { handleShooting, updateWeapon } from './weapon.js';
 import { initWorld, updateWorld } from './world.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-
+import { initWeapon } from './weapon.js';
 class Game {
     constructor() {
         this.container = document.getElementById('game-container');
@@ -20,6 +20,8 @@ class Game {
             position: { x: 0, y: CONFIG.PLAYER_HEIGHT, z: 10 },
             velocity: { x: 0, y: 0, z: 0 },
             rotation: { pitch: 0, yaw: 0 },
+            health: 100,
+            score: 0,
             isGrounded: false,
             isJumping: false,
             isShooting: false,
@@ -48,6 +50,10 @@ class Game {
             mouseDelta: { x: 0, y: 0 }
         };
 
+        this.weapon = {
+            cooldown: 0
+        };
+
         this.init();
     }
 
@@ -55,10 +61,10 @@ class Game {
         // Scene setup
         this.scene = new THREE.Scene();
         this.scene.background = new THREE.Color(0x111111);
-        
+
         // Camera setup
         this.camera = new THREE.PerspectiveCamera(CONFIG.FOV_BASE, window.innerWidth / window.innerHeight, 0.1, 1000);
-        
+
         // Renderer setup
         this.renderer = new THREE.WebGLRenderer({ antialias: true });
         this.renderer.setSize(window.innerWidth, window.innerHeight);
@@ -68,11 +74,15 @@ class Game {
         // Assets
         this.gltfLoader = new GLTFLoader();
 
+
+
         // Lights & Environment
         initWorld(this.scene);
 
         // Input
         initInput(this);
+
+        initWeapon(this.scene, this.camera);
 
         // Window resize
         window.addEventListener('resize', () => this.onWindowResize());
@@ -118,7 +128,7 @@ class Game {
 
         // Render at max possible FPS
         this.render();
-        
+
         // Update HUD
         this.updateHUD(deltaTime);
     }
@@ -142,12 +152,18 @@ class Game {
         this.renderer.render(this.scene, this.camera);
     }
 
+    takeDamage(amount) {
+        this.playerState.health = Math.max(0, this.playerState.health - amount);
+    }
+
     updateHUD(dt) {
-        const speed = Math.sqrt(this.playerState.velocity.x**2 + this.playerState.velocity.z**2);
-        
+        const speed = Math.sqrt(this.playerState.velocity.x ** 2 + this.playerState.velocity.z ** 2);
+
         document.getElementById('fps-counter').innerText = `FPS: ${Math.round(1 / dt)}`;
+        document.getElementById('player-hp').innerText = `HP: ${Math.round(this.playerState.health)}`;
+        document.getElementById('score-display').innerText = `SCORE: ${this.playerState.score}`;
         document.getElementById('speed-meter').innerText = `SPD: ${speed.toFixed(1)}`;
-        
+
         const slideStatus = document.getElementById('slide-status');
         if (this.playerState.isSliding) {
             slideStatus.innerText = 'SLD: ACTIVE';

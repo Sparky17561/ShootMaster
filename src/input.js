@@ -14,11 +14,12 @@ export function initInput(game) {
             game.playerState.controlMode = game.playerState.controlMode === 'pointerlock' ? 'trackpad' : 'pointerlock';
             
             if (game.playerState.controlMode === 'pointerlock') {
-                container.requestPointerLock();
+                if (document.pointerLockElement !== container) container.requestPointerLock();
             } else {
                 document.exitPointerLock();
-                game.isStarted = true; // Always active in trackpad mode
+                game.isStarted = true;
                 instruction.style.display = 'none';
+                document.body.classList.remove('paused');
             }
             firstMove = true;
             return;
@@ -55,7 +56,7 @@ export function initInput(game) {
 
     // Pointer Lock Events
     container.addEventListener('click', () => {
-        if (game.playerState.controlMode === 'pointerlock') {
+        if (game.playerState.controlMode === 'pointerlock' && document.pointerLockElement !== container) {
             container.requestPointerLock();
         }
     });
@@ -64,9 +65,11 @@ export function initInput(game) {
         if (game.playerState.controlMode === 'pointerlock') {
             if (document.pointerLockElement === container) {
                 instruction.style.display = 'none';
+                document.body.classList.remove('paused');
                 game.isStarted = true;
             } else {
                 instruction.style.display = 'block';
+                document.body.classList.add('paused');
                 game.isStarted = false;
             }
         }
@@ -83,7 +86,6 @@ export function initInput(game) {
             dx = e.movementX;
             dy = e.movementY;
         } else {
-            // Trackpad fallback: use clientX/Y to calculate delta manually
             if (firstMove) {
                 lastMouseX = e.clientX;
                 lastMouseY = e.clientY;
@@ -96,22 +98,18 @@ export function initInput(game) {
             lastMouseY = e.clientY;
         }
 
-        // Spike Rejection
-        if (Math.abs(dx) > CONFIG.DELTA_SPIKE_THRESHOLD || Math.abs(dy) > CONFIG.DELTA_SPIKE_THRESHOLD) {
-            return;
-        }
+        if (Math.abs(dx) > CONFIG.DELTA_SPIKE_THRESHOLD || Math.abs(dy) > CONFIG.DELTA_SPIKE_THRESHOLD) return;
 
         const sensitivity = game.playerState.controlMode === 'pointerlock' ? CONFIG.MOUSE_SENSITIVITY : CONFIG.TRACKPAD_SENSITIVITY;
 
         game.inputBuffer.mouseDelta.x -= dx * sensitivity;
         game.inputBuffer.mouseDelta.y -= dy * sensitivity;
         
-        // Clamp pitch immediately to avoid buffer issues
         const limit = Math.PI / 2 - 0.1;
         game.inputBuffer.mouseDelta.y = Math.max(-limit, Math.min(limit, game.inputBuffer.mouseDelta.y));
     });
 
-    // Mouse Buttons
+    // Mouse Buttons - Shoot and ADS
     window.addEventListener('mousedown', (e) => {
         if (!game.isStarted) return;
         if (e.button === 0) game.inputBuffer.shoot = true;
@@ -119,27 +117,21 @@ export function initInput(game) {
     });
 
     window.addEventListener('mouseup', (e) => {
-        if (!game.isStarted) return;
         if (e.button === 0) game.inputBuffer.shoot = false;
         if (e.button === 2) game.inputBuffer.ads = false;
     });
 
     container.addEventListener('contextmenu', (e) => e.preventDefault());
-    
-    // Reset tracker on window focus/entry
     window.addEventListener('mouseenter', () => { firstMove = true; });
 }
 
 export function updateInput(game, dt) {
     const isTrackpad = game.playerState.controlMode === 'trackpad';
-    const smoothing = isTrackpad ? CONFIG.TRACKPAD_SMOOTHING : 1.0; // Instant in pointerlock, smoothed in trackpad
+    const smoothing = isTrackpad ? CONFIG.TRACKPAD_SMOOTHING : 1.0;
 
-    // Apply smoothing (lerp) to the target rotation
     game.playerState.rotation.yaw += (game.inputBuffer.mouseDelta.x - game.playerState.rotation.yaw) * smoothing;
     game.playerState.rotation.pitch += (game.inputBuffer.mouseDelta.y - game.playerState.rotation.pitch) * smoothing;
 
-    // Actions
     game.playerState.isShooting = game.inputBuffer.shoot;
     game.playerState.isADS = game.inputBuffer.ads;
 }
-

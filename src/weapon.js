@@ -1,72 +1,107 @@
 import * as THREE from 'three';
 import { CONFIG } from './Config.js';
+import { targets } from './world.js';
 
 const raycaster = new THREE.Raycaster();
-const mouse = new THREE.Vector2(0, 0); // Center of screen
+const mouse = new THREE.Vector2(0, 0);
+
+// CACHE DOM ELEMENT
+const hitMarker = document.getElementById('hit-marker');
+
+// REUSE LIGHT
+let muzzleFlash = null;
+
+export function initWeapon(scene, camera) {
+    muzzleFlash = new THREE.PointLight(0xffaa00, 0, 5);
+    muzzleFlash.visible = false;
+    scene.add(muzzleFlash);
+}
 
 export function updateWeapon(game, dt) {
     const { playerState, inputBuffer } = game;
-
-    // ADS (FOV Zoom)
+    
+    // 1. ADS (FOV Zoom)
     const targetFOV = playerState.isADS ? CONFIG.FOV_ADS : CONFIG.FOV_BASE;
     playerState.currentFOV += (targetFOV - playerState.currentFOV) * CONFIG.ADS_LERP_SPEED * dt;
 
-    // Shooting
+    // 2. Fire Logic
     if (inputBuffer.shoot) {
         handleShooting(game);
-        inputBuffer.shoot = false; // Prevents full auto unless logic added
+    }
+    
+    // Update cooldown
+    if (game.weapon.cooldown > 0) {
+        game.weapon.cooldown -= dt;
     }
 
-    // Recoil Recovery
+    // 3. Recoil Recovery
     playerState.recoilOffset.x *= (1.0 - CONFIG.RECOIL_RECOVERY_SPEED * dt);
     playerState.recoilOffset.y *= (1.0 - CONFIG.RECOIL_RECOVERY_SPEED * dt);
 
-    // Hit Marker Cooldown
-    if (playerState.lastHitTime > 0) playerState.lastHitTime -= dt;
+    // 4. Hit Marker Cooldown
+    if (playerState.lastHitTime > 0) {
+        playerState.lastHitTime -= dt;
+    }
+
+    // 5. Fade Muzzle Flash
+    if (muzzleFlash && muzzleFlash.visible) {
+        muzzleFlash.intensity *= 0.6;
+        if (muzzleFlash.intensity < 0.1) muzzleFlash.visible = false;
+    }
 }
 
 export function handleShooting(game) {
-    const { scene, camera, playerState } = game;
+    const { playerState, inputBuffer, weapon, scene, camera } = game;
+    
+    // Cooldown check
+    if (weapon.cooldown > 0) return;
+    weapon.cooldown = 0.1; // 10 shots per second
 
-    // 1. Raycast
+    // Raycast against targets only
     raycaster.setFromCamera(mouse, camera);
-    const intersects = raycaster.intersectObjects(scene.children, true);
+    const intersects = raycaster.intersectObjects(targets, false);
 
     if (intersects.length > 0) {
-        const hit = intersects[0];
-        if (hit.object.userData.isTarget) {
-            // 1.1 Target Feedback
-            hit.object.material.color.set(0xff0000);
-            hit.object.userData.hitTimer = 0.1; // 100ms flash
-            
-            // Scale Pop
-            if (!hit.object.userData.baseScale) hit.object.userData.baseScale = hit.object.scale.x;
-            hit.object.scale.setScalar(hit.object.userData.baseScale * 1.2);
-            
-            // 1.2 Hit Marker UI
+        const target = intersects[0].object;
+
+        if (!target.userData.isDead) {
+            // Damage
+            target.userData.health -= CONFIG.DAMAGE_PER_SHOT;
+
+            // Feedback
+            target.material.color.set(0xff0000);
+            target.userData.hitTimer = 0.1;
+
+            if (!target.userData.baseScale) target.userData.baseScale = target.scale.x;
+            target.scale.setScalar(target.userData.baseScale * 1.2);
+
+            // Death
+            if (target.userData.health <= 0) {
+                target.userData.isDead = true;
+                target.userData.respawnTimer = CONFIG.RESPAWN_DELAY;
+                playerState.score += 1;
+            }
+
+            // Hit Marker UI
             if (playerState.lastHitTime <= 0) {
-                const marker = document.getElementById('hit-marker');
-                marker.classList.remove('hidden');
-                marker.classList.remove('hit-animate');
-                void marker.offsetWidth; // Trigger reflow
-                marker.classList.add('hit-animate');
-                
+                hitMarker.classList.remove('hidden');
+                hitMarker.classList.remove('hit-animate');
+                void hitMarker.offsetWidth;
+                hitMarker.classList.add('hit-animate');
                 playerState.lastHitTime = CONFIG.HIT_COOLDOWN;
             }
         }
     }
 
-    // 2. Apply Recoil
+    // Apply Recoil & Shake (Managed by Game.js render loop)
     playerState.recoilOffset.y += CONFIG.RECOIL_KICK;
     playerState.recoilOffset.x += (Math.random() - 0.5) * CONFIG.RECOIL_RANDOM_HORIZONTAL;
 
-    // 3. Muzzle Flash (Visual only light)
-    const flash = new THREE.PointLight(0xffaa00, 5, 5);
-    flash.position.set(camera.position.x, camera.position.y - 0.2, camera.position.z);
-    scene.add(flash);
-    setTimeout(() => scene.remove(flash), 50);
+    // Muzzle Flash
+    muzzleFlash.position.copy(camera.position);
+    muzzleFlash.intensity = 3;
+    muzzleFlash.visible = true;
 
-    // 4. Subtle Screen Shake (Simple position nudge)
-    camera.position.x += (Math.random() - 0.5) * 0.05;
-    camera.position.y += (Math.random() - 0.5) * 0.05;
+    // Consume input
+    inputBuffer.shoot = false;
 }

@@ -122,11 +122,14 @@ body {
     font-family: 'Courier New', Courier, monospace;
 }
 
-#fps-counter, #speed-meter, #slide-status, #control-mode {
+#fps-counter, #speed-meter, #slide-status, #control-mode, #player-hp, #score-display {
     font-size: 14px;
     font-weight: bold;
     margin-bottom: 4px;
 }
+
+#player-hp { color: #ff5555; }
+#score-display { color: #ffffff; }
 
 #mode-hint {
     font-size: 11px;
@@ -145,12 +148,39 @@ body {
 
 #instruction {
     position: absolute;
-    top: 50vh;
-    left: 50vw;
+    top: 50%;
+    left: 50%;
     transform: translate(-50%, -50%);
-    font-size: 24px;
-    background: rgba(0, 0, 0, 0.5);
-    padding: 10px 20px;
-    border-radius: 5px;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
     pointer-events: none;
+    z-index: 100;
+    font-size: 32px;
+    color: #00ff00;
+}
+
+#instruction span {
+    font-size: 16px;
+    margin-top: 10px;
+    opacity: 0.8;
+}
+
+/* Pause Overlay Visibility */
+#instruction {
+    display: none; /* Hidden by default */
+}
+
+body.paused #instruction {
+    display: flex !important;
+}
+
+body.paused #crosshair,
+body.paused #hud {
+    display: none !important;
 }
