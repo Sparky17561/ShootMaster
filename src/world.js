@@ -5,6 +5,7 @@ export let targets = [];
 export let bots = [];
 export let obstacles = [];
 export let tracers = [];
+export let mapStructure = []; // For Minimap Floorplans
 const _tempVec = new THREE.Vector3();
 const _zeroVec = new THREE.Vector3(0, 0, 0);
 const _botRaycaster = new THREE.Raycaster();
@@ -93,43 +94,53 @@ export function initWorld(scene, game) {
         obstacles.push(wall);
     });
 
-    // 4.5. Urban Complexes
-    // Complex A: Central Apartment (-40, -40)
-    createBuilding(scene, -40, -40, 25, 20, 8, platformMaterial); 
-    createBuilding(scene, -40, -40, 20, 15, 14, accentMaterial); 
-    createStairs(scene, new THREE.Vector3(-40, 0, -25), 20, 0.2, 8, platformMaterial);
+    // 4.5. Tactical Complexes (Architected Symmetrically)
+    const complexSize = 25;
+    const outpostPositions = [
+        { x: 80, z: 80 }, { x: -80, z: 80 },
+        { x: 80, z: -80 }, { x: -80, z: -80 }
+    ];
 
-    // Complex B: Sniper Nest (60, 60)
-    createBuilding(scene, 60, 60, 15, 15, 10, platformMaterial);
-    createStairs(scene, new THREE.Vector3(60, 0, 48), 25, 0.2, 5, platformMaterial);
+    outpostPositions.forEach(pos => {
+        // Base structure
+        createBuilding(scene, pos.x, pos.z, complexSize, complexSize, 8, platformMaterial);
+        mapStructure.push({ x: pos.x, z: pos.z, w: complexSize, d: complexSize });
+        
+        // High-speed ramps instead of stairs
+        const rampStart = new THREE.Vector3(pos.x, 0, pos.z + complexSize/2 + 20);
+        createRamp(scene, rampStart, 20, 8, 12, platformMaterial);
+    });
 
-    // Complex C: Balcony Blocks (-80, 80)
-    createBuilding(scene, -80, 80, 30, 20, 6, platformMaterial);
-    createStairs(scene, new THREE.Vector3(-95, 0, 80), 15, 0.2, 6, platformMaterial);
-
-    // Complex D: Logistics Hub (70, -70)
-    createBuilding(scene, 70, -70, 20, 40, 8, accentMaterial);
-    createStairs(scene, new THREE.Vector3(70, 0, -90), 20, 0.2, 10, platformMaterial);
-
-    // 5. Moving Targets (Removed)
-    targets = []; // Ensure empty
-
-    // 6. Bots (Multi-part for Headshots)
+    // 6. Bots (Diversified Types)
     for (let i = 0; i < CONFIG.BOT_COUNT; i++) {
         const botGroup = new THREE.Group();
+        const isSniper = Math.random() < CONFIG.BOT_TYPES.SNIPER.probability;
+        const botType = isSniper ? 'SNIPER' : 'GRUNT';
+        const config = CONFIG.BOT_TYPES[botType];
         
-        // Body (Cylinder)
-        const bodyGeom = new THREE.CylinderGeometry(CONFIG.BOT_RADIUS, CONFIG.BOT_RADIUS, CONFIG.BOT_HEIGHT - 0.5, 16);
-        bodyGeom.translate(0, (CONFIG.BOT_HEIGHT - 0.5) / 2, 0);
-        const bodyMat = new THREE.MeshStandardMaterial({ color: 0xff4400 });
+        const bHeight = isSniper ? 3.0 : CONFIG.BOT_HEIGHT;
+        const bRadius = isSniper ? 0.9 : CONFIG.BOT_RADIUS;
+
+        // Body
+        const bodyGeom = new THREE.CylinderGeometry(bRadius, bRadius, bHeight - 0.5, 16);
+        bodyGeom.translate(0, (bHeight - 0.5) / 2, 0);
+        const bodyMat = new THREE.MeshStandardMaterial({ 
+            color: isSniper ? 0xcc00ff : 0xff4400,
+            emissive: isSniper ? 0xcc00ff : 0xff4400,
+            emissiveIntensity: isSniper ? 5.0 : 0.8
+        });
         const body = new THREE.Mesh(bodyGeom, bodyMat);
         body.userData.parentBot = botGroup;
         botGroup.add(body);
 
-        // Head (Sphere)
-        const headGeom = new THREE.SphereGeometry(0.4, 16, 16);
-        headGeom.translate(0, CONFIG.BOT_HEIGHT - 0.2, 0);
-        const headMat = new THREE.MeshStandardMaterial({ color: 0xffff00 }); // Yellow Head
+        // Head
+        const headGeom = new THREE.SphereGeometry(isSniper ? 0.5 : 0.4, 16, 16);
+        headGeom.translate(0, bHeight - 0.2, 0);
+        const headMat = new THREE.MeshStandardMaterial({ 
+            color: 0xffff00, 
+            emissive: 0xffff00, 
+            emissiveIntensity: isSniper ? 5.0 : 0.5 
+        });
         const head = new THREE.Mesh(headGeom, headMat);
         head.userData.isHead = true;
         head.userData.parentBot = botGroup;
@@ -141,20 +152,19 @@ export function initWorld(scene, game) {
 
         botGroup.userData = {
             isBot: true,
-            originalColor: 0xff4400,
-            baseScale: 1,
+            botType: botType,
             health: CONFIG.BOT_HEALTH,
             isDead: false,
             respawnTimer: 0,
             hitTimer: 0,
-            state: 'idle', 
-            shootCooldown: 0,
+            shootCooldown: Math.random() * config.fireRate,
+            strafeTimer: 0,
+            strafeDir: 1,
+            state: 'idle',
             reactionTimer: 0,
             isAiming: false,
             aimTimer: 0,
-            laserLine: null,
-            strafeDir: Math.random() > 0.5 ? 1 : -1,
-            strafeTimer: 0
+            laserLine: null
         };
 
         scene.add(botGroup);
@@ -171,74 +181,67 @@ export function initWorld(scene, game) {
 }
 
 function initPickups(scene, game) {
-    const geom = new THREE.BoxGeometry(1, 1, 1);
-    const mat = new THREE.MeshStandardMaterial({ 
-        color: 0x00ff44, 
-        emissive: 0x00ff44, 
-        emissiveIntensity: 0.5 
-    });
+    const healthGeom = new THREE.BoxGeometry(1, 1, 1);
+    const ammoGeom = new THREE.BoxGeometry(1.2, 0.6, 1.2);
+    
+    const healthMat = new THREE.MeshStandardMaterial({ color: 0x00ff44, emissive: 0x00ff44, emissiveIntensity: 0.5 });
+    const ammoMat = new THREE.MeshStandardMaterial({ color: 0x0044ff, emissive: 0x0044ff, emissiveIntensity: 0.5 });
 
     for (let i = 0; i < CONFIG.PICKUP_SPAWN_COUNT; i++) {
-        const pickup = new THREE.Mesh(geom, mat);
-        pickup.position.set(
-            (Math.random() - 0.5) * 80,
-            1,
-            (Math.random() - 0.5) * 80
-        );
-        pickup.userData = {
-            type: 'health',
-            respawnTimer: 0
-        };
-        scene.add(pickup);
-        game.pickups.push(pickup);
+        // Health
+        const h = new THREE.Mesh(healthGeom, healthMat);
+        const posH = getRandomSafePosition(new THREE.Vector3(0,0,0));
+        h.position.set(posH.x, 0.5, posH.z);
+        h.userData = { type: 'health', respawnTimer: 0 };
+        scene.add(h); game.pickups.push(h);
+
+        // Ammo
+        const a = new THREE.Mesh(ammoGeom, ammoMat);
+        const posA = getRandomSafePosition(new THREE.Vector3(0,0,0));
+        a.position.set(posA.x, 0.3, posA.z);
+        a.userData = { type: 'ammo', respawnTimer: 0 };
+        scene.add(a); game.pickups.push(a);
     }
 }
 
 function createBuilding(scene, x, z, w, d, h, material) {
-    const wallThick = 1;
-    // Walls
+    const wallThick = 2.0; 
     const wallConfigs = [
-        { size: [w, h, wallThick], pos: [x, h/2, z - d/2] }, // Back
-        { size: [w, h, wallThick], pos: [x, h/2, z + d/2], door: true }, // Front
-        { size: [wallThick, h, d], pos: [x - w/2, h/2, z] }, // Left
-        { size: [wallThick, h, d], pos: [x + w/2, h/2, z] }  // Right
+        { size: [w, h + wallThick, wallThick], pos: [x, h/2, z - d/2] }, 
+        { size: [w, h + wallThick, wallThick], pos: [x, h/2, z + d/2], door: true }, 
+        { size: [wallThick, h + wallThick, d], pos: [x - w/2, h/2, z] }, 
+        { size: [wallThick, h + wallThick, d], pos: [x + w/2, h/2, z] }  
     ];
 
     wallConfigs.forEach(cfg => {
         const wall = new THREE.Mesh(new THREE.BoxGeometry(...cfg.size), material);
         wall.position.set(...cfg.pos);
         if (cfg.door) {
-            // Cut a door
-            wall.scale.x = 0.3; // Simple way to make a gap
+            wall.scale.x = 0.3;
             wall.position.x += w * 0.35;
         }
-        wall.castShadow = true;
-        wall.receiveShadow = true;
-        scene.add(wall);
-        obstacles.push(wall);
+        wall.castShadow = true; wall.receiveShadow = true;
+        scene.add(wall); obstacles.push(wall);
     });
 
-    // Roof
+    // Solid Roof Platform
     const roof = new THREE.Mesh(new THREE.BoxGeometry(w, wallThick, d), material);
-    roof.position.set(x, h, z);
-    scene.add(roof);
-    obstacles.push(roof);
+    roof.position.set(x, h + wallThick/2, z);
+    roof.castShadow = true; roof.receiveShadow = true;
+    scene.add(roof); obstacles.push(roof);
 }
 
-function createStairs(scene, startPos, numSteps, stepHeight, stepWidth, material) {
-    const stepDepth = 0.8;
-    for (let i = 0; i < numSteps; i++) {
-        const step = new THREE.Mesh(new THREE.BoxGeometry(stepWidth, 0.2, stepDepth), material);
-        step.position.set(
-            startPos.x, 
-            startPos.y + (i * stepHeight) + 0.1, 
-            startPos.z + (i * stepDepth)
-        );
-        step.castShadow = true;
-        step.receiveShadow = true;
-        scene.add(step);
-        obstacles.push(step);
-    }
+function createRamp(scene, startPos, length, height, width, material) {
+    const angle = Math.atan2(height, length);
+    const rampLen = Math.sqrt(length * length + height * height);
+    const ramp = new THREE.Mesh(new THREE.BoxGeometry(width, 0.2, rampLen), material);
+    
+    // Position at midpoint and rotate
+    ramp.position.set(startPos.x, startPos.y + height/2, startPos.z - length/2);
+    ramp.rotation.x = angle;
+    
+    ramp.castShadow = true; ramp.receiveShadow = true;
+    scene.add(ramp); obstacles.push(ramp);
 }
 
 function getRandomSafePosition(playerPosition) {
@@ -428,11 +431,30 @@ export function updateBots(game, dt, playerHitbox) {
     const { playerState, scene } = game;
     _playerPos.set(playerState.position.x, playerState.position.y - CONFIG.PLAYER_HEIGHT / 2, playerState.position.z);
 
+    // Sniper Promotion Logic (Every 5 kills)
+    const sniperCount = bots.filter(b => b.userData.botType === 'SNIPER' && !b.userData.isDead).length;
+    const targetSnipers = Math.floor(game.playerState.score / 5);
+    
+    if (sniperCount < targetSnipers) {
+        const eligible = bots.filter(b => b.userData.botType === 'GRUNT' && !b.userData.isDead);
+        if (eligible.length > 0) {
+            const bot = eligible[Math.floor(Math.random() * eligible.length)];
+            bot.userData.botType = 'SNIPER';
+            bot.traverse(c => { if(c.isMesh && !c.userData.isHead) c.material.color.set(0xcc00ff); });
+            game.addEvent("SNIPER INBOUND!", "#cc00ff");
+        }
+    }
+
     bots.forEach(bot => {
         // 1. Death & Respawn Logic
         if (bot.userData.isDead) {
             bot.userData.respawnTimer -= dt;
             if (bot.userData.respawnTimer <= 0) {
+                // When respawning, reset to Grunt if we have too many snipers
+                if (sniperCount >= targetSnipers) {
+                   bot.userData.botType = 'GRUNT';
+                   bot.traverse(c => { if(c.isMesh && !c.userData.isHead) c.material.color.set(0xff4400); });
+                }
                 const newPos = getRandomSafePosition(_playerPos);
                 bot.position.copy(newPos);
                 bot.position.y = 0; 
@@ -465,14 +487,15 @@ export function updateBots(game, dt, playerHitbox) {
         }
 
         // 3. AI Behavior
+        const isSniper = bot.userData.botType === 'SNIPER';
+        const detectRange = isSniper ? 120 : CONFIG.BOT_DETECTION_RANGE;
         const distToPlayer = bot.position.distanceTo(_playerPos);
 
         // State Transition & Reaction Timing
-        if (bot.userData.state === 'idle' && distToPlayer < CONFIG.BOT_DETECTION_RANGE) {
+        if (bot.userData.state === 'idle' && distToPlayer < detectRange) {
             bot.userData.state = 'chasing';
-            // Set a random reaction time before firing the first shot
             bot.userData.reactionTimer = CONFIG.BOT_REACTION_MIN + Math.random() * (CONFIG.BOT_REACTION_MAX - CONFIG.BOT_REACTION_MIN);
-        } else if (bot.userData.state === 'chasing' && distToPlayer > CONFIG.BOT_DETECTION_RANGE * 1.5) {
+        } else if (bot.userData.state === 'chasing' && distToPlayer > detectRange * 1.5) {
             bot.userData.state = 'idle';
             bot.userData.reactionTimer = 0;
         }
@@ -567,19 +590,32 @@ export function updateBots(game, dt, playerHitbox) {
                 } else {
                     // Update/Create Laser Sight
                     const endPoint = rayOrigin.clone().addScaledVector(_dirToPlayer, distToPlayer);
+                    const isSniper = bot.userData.botType === 'SNIPER';
                     if (!bot.userData.laserLine) {
                         const geom = new THREE.BufferGeometry().setFromPoints([rayOrigin, endPoint]);
-                        const mat = new THREE.LineBasicMaterial({ color: CONFIG.LASER_COLOR, transparent: true, opacity: 0.3 });
+                        const mat = new THREE.LineBasicMaterial({ 
+                            color: isSniper ? 0xff00ff : 0xff0000, 
+                            transparent: true, 
+                            opacity: isSniper ? 1.0 : 0.4,
+                            linewidth: isSniper ? 5 : 1
+                        });
                         bot.userData.laserLine = new THREE.Line(geom, mat);
                         scene.add(bot.userData.laserLine);
                     } else {
                         bot.userData.laserLine.geometry.setFromPoints([rayOrigin, endPoint]);
+                        bot.userData.laserLine.material.color.setHex(isSniper ? 0xff00ff : 0xff0000);
+                        bot.userData.laserLine.material.opacity = isSniper ? 1.0 : 0.4;
                     }
 
                     // FIRE!
                     if (bot.userData.aimTimer <= 0) {
-                        // 1. Calculate Spread Direction
-                        const spread = CONFIG.BOT_AIM_SPREAD;
+                        const config = CONFIG.BOT_TYPES[bot.userData.botType];
+                        // 1. Calculate Spread with Evasion Factor
+                        const playerVel = game.playerState.velocity;
+                        const playerSpeed = Math.sqrt(playerVel.x * playerVel.x + playerVel.z * playerVel.z);
+                        const evasionSpread = playerSpeed * CONFIG.BOT_EVASION_FACTOR;
+                        
+                        const spread = (isSniper ? 0.001 : config.accuracy) + evasionSpread;
                         const shotDir = _dirToPlayer.clone();
                         shotDir.x += (Math.random() - 0.5) * spread;
                         shotDir.y += (Math.random() - 0.5) * spread;
@@ -596,25 +632,21 @@ export function updateBots(game, dt, playerHitbox) {
                             hitDist = firstHit.distance;
 
                             if (firstHit.object === playerHitbox) {
-                                game.takeDamage(CONFIG.BOT_DAMAGE);
+                                game.takeDamage(config.damage);
                             }
                         }
                         
                         // 3. Spawn Visual Tracer (Matched to Raycast)
                         const tracerEnd = rayOrigin.clone().addScaledVector(shotDir, Math.min(hitDist, distToPlayer+5));
-                        spawnTracer(rayOrigin, tracerEnd, scene);
-                        
+                        spawnTracer(rayOrigin, tracerEnd, scene, bot.userData.botType === 'SNIPER' ? 0xff00ff : 0xffff00);
+
                         // Cleanup
                         bot.userData.isAiming = false;
-                        bot.userData.shootCooldown = CONFIG.BOT_SHOOT_INTERVAL + (Math.random() * 1.0);
+                        bot.userData.shootCooldown = config.fireRate + (Math.random() * 2.0);
                         if (bot.userData.laserLine) {
                             scene.remove(bot.userData.laserLine);
                             bot.userData.laserLine = null;
                         }
-                        
-                        // Shot feedback
-                        bot.material.emissive.set(0xff0000);
-                        setTimeout(() => { if(bot.material) bot.material.emissive.set(0x000000); }, 100);
                     }
                 }
             } else {
@@ -624,13 +656,13 @@ export function updateBots(game, dt, playerHitbox) {
     });
 }
 
-export function spawnTracer(start, end, scene) {
+export function spawnTracer(start, end, scene, color = 0xffff00) {
     const points = [start, end];
     const geometry = new THREE.BufferGeometry().setFromPoints(points);
     const material = new THREE.LineBasicMaterial({ 
-        color: CONFIG.TRACER_COLOR, 
+        color: color, 
         transparent: true, 
-        opacity: 0.8 
+        opacity: color === 0xff00ff ? 1.0 : 0.8 
     });
     const line = new THREE.Line(geometry, material);
     

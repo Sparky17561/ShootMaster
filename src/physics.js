@@ -132,40 +132,38 @@ export function updatePhysics(game, dt) {
 
     // 7. Ground / Height Handling
     const targetHeight = playerState.isCrouching ? CONFIG.CROUCH_HEIGHT : CONFIG.PLAYER_HEIGHT;
+    const playerHalfWidth = CONFIG.PLAYER_WIDTH / 2;
+    const playerFeetY = playerState.position.y - targetHeight;
+    const playerHeadY = playerState.position.y + 0.1;
+    let isStandingOnSomething = false;
 
     // B. Obstacle Collisions (AABB)
-    const playerHalfWidth = CONFIG.PLAYER_WIDTH / 2;
     obstacles.forEach(obstacle => {
         const box = obstacle.userData.aabb || new THREE.Box3().setFromObject(obstacle);
         
-        // Recalculate local bounds for every check (since player might move during loop)
         const curMinX = playerState.position.x - playerHalfWidth;
         const curMaxX = playerState.position.x + playerHalfWidth;
         const curMinZ = playerState.position.z - playerHalfWidth;
         const curMaxZ = playerState.position.z + playerHalfWidth;
-        const curFeetY = playerState.position.y - targetHeight;
 
-        // 1. Horizontal Check
         if (curMaxX > box.min.x && curMinX < box.max.x &&
             curMaxZ > box.min.z && curMinZ < box.max.z) {
             
-            const playerHeadY = playerState.position.y + 0.2; // approx head top
-            const heightDiff = box.max.y - curFeetY;
-            const ceilingDiff = playerHeadY - box.min.y;
+            const distFromTop = playerFeetY - box.max.y;
 
-            // STEP UP: Small ledge
-            if (heightDiff > 0 && heightDiff <= CONFIG.STEP_HEIGHT) {
-                playerState.position.y = box.max.y + targetHeight + 0.01; 
+            // 1. FEET: Ground / Ledge / Step Up
+            if (distFromTop > -0.5 && distFromTop < 0.1) {
+                playerState.position.y = box.max.y + targetHeight;
                 playerState.velocity.y = 0;
-                playerState.isGrounded = true;
+                isStandingOnSomething = true;
             } 
-            // CEILING COLLISION: Hit head from below
-            else if (ceilingDiff > 0 && playerState.position.y < box.max.y && playerState.position.y > box.min.y) {
-                playerState.position.y = box.min.y - 0.21;
+            // 2. HEAD: Ceiling
+            else if (playerHeadY > box.min.y && playerState.position.y < box.max.y) {
+                playerState.position.y = box.min.y - 0.2;
                 playerState.velocity.y = 0;
             }
-            // HARD WALL: Resolve horizontally
-            else if (heightDiff > CONFIG.STEP_HEIGHT) {
+            // 3. BODY: Walls
+            else if (playerHeadY > box.min.y && playerFeetY < box.max.y) {
                 const overlapX = Math.min(curMaxX, box.max.x) - Math.max(curMinX, box.min.x);
                 const overlapZ = Math.min(curMaxZ, box.max.z) - Math.max(curMinZ, box.min.z);
 
@@ -182,12 +180,12 @@ export function updatePhysics(game, dt) {
         }
     });
 
-    if (playerState.isGrounded) {
-        playerState.position.y = THREE.MathUtils.lerp(playerState.position.y, targetHeight, 10 * dt);
-    }
-
-    if (playerState.position.y <= targetHeight + 0.05) {
-        if (playerState.position.y < targetHeight) playerState.position.y = targetHeight;
+    // Floor / Gravity
+    if (playerState.position.y <= targetHeight) {
+        playerState.position.y = targetHeight;
+        playerState.isGrounded = true;
+        playerState.velocity.y = 0;
+    } else if (isStandingOnSomething) {
         playerState.isGrounded = true;
     } else {
         playerState.isGrounded = false;

@@ -37,8 +37,26 @@ export function updateWeapon(game, dt) {
     const currentWep = playerState.inventory[playerState.currentWeaponIndex];
     
     // 1. ADS (FOV Zoom)
-    const targetFOV = playerState.isADS ? CONFIG.FOV_ADS : CONFIG.FOV_BASE;
+    const isSniper = currentWep.name === 'Heavy Sniper';
+    const onHighGround = game.playerState.position.y > 3.0;
+    const targetFOV = (playerState.isADS && (!isSniper || onHighGround)) ? 
+        (isSniper ? 15 : CONFIG.FOV_ADS) : 
+        CONFIG.FOV_BASE;
     playerState.currentFOV += (targetFOV - playerState.currentFOV) * CONFIG.ADS_LERP_SPEED * dt;
+
+    // Sniper Scope Overlay
+    const scope = document.getElementById('sniper-scope');
+    const xhair = document.getElementById('crosshair');
+    if (isSniper && playerState.isADS && onHighGround) {
+        scope.classList.add('active');
+        xhair.style.opacity = '0';
+    } else {
+        scope.classList.remove('active');
+        xhair.style.opacity = '1';
+        if (isSniper && playerState.isADS && !onHighGround) {
+             playerState.isADS = false; // Auto-cancel if jumping off roof
+        }
+    }
 
     // 2. Reloading Logic
     if (playerState.isReloading) {

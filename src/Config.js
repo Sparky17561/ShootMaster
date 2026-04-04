@@ -21,8 +21,9 @@ export const CONFIG = {
     SLIDE_FOV_MOD: 10,       
     SLIDE_TILT: 0.05,       
 
+    MISSION_TIME: 300, // 5 Minutes
     // Step-Up (Stair Climbability)
-    STEP_HEIGHT: 0.25,
+    STEP_HEIGHT: 0.5,
 
     // Mouse
     MOUSE_SENSITIVITY: 0.002,
@@ -60,7 +61,7 @@ export const CONFIG = {
             reserve: 90,
             isAutomatic: true,
             spread: 0.015,
-            recoil: 0.04, // Reduced from 0.08
+            recoil: 0.02, 
             reloadTime: 2.0
         },
         SHOTGUN: {
@@ -76,13 +77,18 @@ export const CONFIG = {
             recoil: 0.25,
             reloadTime: 3.0
         },
-        GRENADE: {
-            name: 'Grenade',
-            damage: 200,
-            radius: 15,
-            fuse: 2.0,
-            tossForce: 25.0,
-            count: 3
+        SNIPER: {
+            name: 'Heavy Sniper',
+            damage: 999, // One-Shot
+            fireRate: 1.2,
+            magSize: 5,
+            ammo: 5,
+            reserve: 15,
+            isAutomatic: false,
+            spread: 0.0,
+            recoil: 1.2,
+            reloadTime: 3.5,
+            fov: 15 // High zoom
         }
     },
     // Visual Effects
@@ -93,6 +99,7 @@ export const CONFIG = {
 
     // Pickups
     PICKUP_HEALTH_VALUE: 25,
+    PICKUP_AMMO_VALUE: 30,
     PICKUP_SPAWN_COUNT: 4,
     PICKUP_RESPAWN_TIME: 15.0,
 
@@ -105,18 +112,20 @@ export const CONFIG = {
 
     // Bots
     BOT_COUNT: 15,
+    BOT_TYPES: {
+        GRUNT: { damage: 15, accuracy: 0.1, fireRate: 2.5, probability: 1.0 },
+        SNIPER: { damage: 50, accuracy: 0.01, fireRate: 4.0, probability: 0.0 }
+    },
+    BOT_EVASION_FACTOR: 0.005,
     BOT_HEALTH: 100,
     BOT_SPEED: 5.5,
     BOT_STRAFE_SPEED: 3.5,
     BOT_DETECTION_RANGE: 50.0,
     BOT_STOP_DISTANCE: 12.0,
-    BOT_SHOOT_INTERVAL: 2.5,
     BOT_REACTION_MIN: 0.4,
     BOT_REACTION_MAX: 1.2,
-    BOT_DAMAGE: 15,
-    BOT_AIM_SPREAD: 0.1, // Radians of spread
     BOT_ROTATION_SPEED: 8.0,
-    BOT_HEIGHT: 2.2,
+    BOT_HEIGHT: 2.0,
     BOT_RADIUS: 0.7,
     BOT_AIM_TIME: 0.8,
     LASER_COLOR: 0xff0000,
@@ -124,10 +133,10 @@ export const CONFIG = {
     TRACER_COLOR: 0xffff00,
 
     // Mechanics
-    PLAYER_HEIGHT: 1.8,
+    PLAYER_HEIGHT: 2.0,
     PLAYER_WIDTH: 0.8,
     PLAYER_RESPAWN_TIME: 3.0,
-    RESPAWN_DELAY: 5.0,
+    PLAYER_RESPAWN_DELAY: 5.0,
     FIXED_UPDATE_RATE: 1 / 60, // 60Hz
 };
 

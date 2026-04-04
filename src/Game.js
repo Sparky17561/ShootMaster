@@ -3,7 +3,7 @@ import { CONFIG } from './Config.js';
 import { updateInput, initInput } from './input.js';
 import { updatePhysics } from './physics.js';
 import { handleShooting, updateWeapon } from './weapon.js';
-import { initWorld, updateWorld, updateBots, bots, obstacles } from './world.js';
+import { initWorld, updateWorld, updateBots, bots, obstacles, mapStructure } from './world.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { initWeapon } from './weapon.js';
 class Game {
@@ -16,6 +16,7 @@ class Game {
         this.accumulator = 0;
         this.isStarted = false;
 
+        this.missionTimer = CONFIG.MISSION_TIME;
         this.playerState = {
             position: { x: 0, y: CONFIG.PLAYER_HEIGHT, z: 80 },
             velocity: { x: 0, y: 0, z: 0 },
@@ -28,7 +29,7 @@ class Game {
             isADS: false,
             isSliding: false,
             isCrouching: false,
-            controlMode: 'pointerlock', // 'pointerlock' or 'trackpad'
+            controlMode: 'pointerlock', 
             slideDirection: { x: 0, z: 0 },
             slideTimer: 0,
             slideCooldown: 0,
@@ -45,7 +46,8 @@ class Game {
             inventory: [
                 { ...CONFIG.WEAPONS.PISTOL },
                 { ...CONFIG.WEAPONS.RIFLE },
-                { ...CONFIG.WEAPONS.SHOTGUN }
+                { ...CONFIG.WEAPONS.SHOTGUN },
+                { ...CONFIG.WEAPONS.SNIPER }
             ],
             currentWeaponIndex: 0,
             isReloading: false,
@@ -53,6 +55,7 @@ class Game {
             grenades: 3
         };
         this.worldGrenades = [];
+        this.minimapElements = { buildings: [], bots: [] };
 
         this.inputBuffer = {
             forward: false,
@@ -154,19 +157,28 @@ class Game {
         for (let i = this.pickups.length - 1; i >= 0; i--) {
             const p = this.pickups[i];
             if (p.visible) {
-                const dist = p.position.distanceTo(this.playerHitbox.position);
-                if (dist < 2.0 && this.playerState.health < 100) {
-                    this.playerState.health = Math.min(100, this.playerState.health + CONFIG.PICKUP_HEALTH_VALUE);
-                    p.visible = false;
-                    p.userData.respawnTimer = CONFIG.PICKUP_RESPAWN_TIME;
+                const dist = p.position.distanceTo(new THREE.Vector3(this.playerState.position.x, 0.5, this.playerState.position.z));
+                if (dist < 2.0) {
+                    if (p.userData.type === 'health' && this.playerState.health < 100) {
+                        this.playerState.health = Math.min(100, this.playerState.health + CONFIG.PICKUP_HEALTH_VALUE);
+                        this.addEvent("HEALTH COLLECTED", "#0f4");
+                        p.visible = false;
+                        p.userData.respawnTimer = CONFIG.PICKUP_RESPAWN_TIME;
+                    } else if (p.userData.type === 'ammo') {
+                        const curWep = this.playerState.inventory[this.playerState.currentWeaponIndex];
+                        if (curWep.reserve !== Infinity && curWep.reserve !== null) {
+                            curWep.reserve += CONFIG.PICKUP_AMMO_VALUE;
+                            this.addEvent("AMMO COLLECTED", "#04f");
+                            p.visible = false;
+                            p.userData.respawnTimer = CONFIG.PICKUP_RESPAWN_TIME;
+                        }
+                    }
                 }
             } else {
                 p.userData.respawnTimer -= dt;
                 if (p.userData.respawnTimer <= 0) p.visible = true;
             }
-            // Bobbing animation
             p.rotation.y += dt;
-            p.position.y = 1.0 + Math.sin(Date.now() * 0.003) * 0.2;
         }
 
         // 7. Bot AI Logic
@@ -324,47 +336,79 @@ class Game {
             banner.classList.add('hidden');
         }
 
-        // 5. Minimap Logic (Relative Radar)
+        // 5. Mission Timer
+        if (this.isStarted && !this.playerState.isDead) {
+            this.missionTimer -= dt;
+            if (this.missionTimer <= 0) {
+                this.missionTimer = 0;
+                this.isStarted = false; // Stop game
+                document.getElementById('death-screen').innerHTML = `MISSION COMPLETE<br><span>SCORE: ${this.playerState.score}</span>`;
+                document.body.classList.add('dead');
+            }
+        }
+        const timerEl = document.getElementById('mission-timer');
+        if (timerEl) {
+            const mins = Math.floor(Math.abs(this.missionTimer) / 60);
+            const secs = Math.floor(Math.abs(this.missionTimer) % 60);
+            timerEl.innerText = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        }
+        // Optimized Minimap (Pooling to prevent Lag)
         const minimap = document.getElementById('minimap-container');
         const pDot = document.getElementById('minimap-player');
-        const radarRadius = 60; // 60m visible on minimap
-        
-        // Player is always center in relative mode
-        pDot.style.left = '50%';
-        pDot.style.top = '50%';
-
-        const oldDots = minimap.querySelectorAll('.bot-dot, .obstacle-dot');
-        oldDots.forEach(d => d.remove());
-
+        const radarRadius = 80; // 80m visible range
         const px = this.playerState.position.x;
         const pz = this.playerState.position.z;
 
-        // Draw Obstacles (Local only)
-        obstacles.forEach(obs => {
-            const dx = obs.position.x - px;
-            const dz = obs.position.z - pz;
-            if (Math.abs(dx) < radarRadius && Math.abs(dz) < radarRadius) {
-                const dot = document.createElement('div');
-                dot.className = 'obstacle-dot';
-                dot.style.left = `${(dx / (radarRadius * 2) + 0.5) * 100}%`;
-                dot.style.top = `${(dz / (radarRadius * 2) + 0.5) * 100}%`;
-                const size = Math.max(2, (obs.geometry.parameters.width || 2) * (140 / (radarRadius * 2)));
-                dot.style.width = `${size}px`;
-                dot.style.height = `${size}px`;
-                minimap.appendChild(dot);
+        // 1. Initialize Pools if empty
+        if (this.minimapElements.buildings.length === 0) {
+            mapStructure.forEach(() => {
+                const el = document.createElement('div');
+                el.className = 'building-rect';
+                minimap.appendChild(el);
+                this.minimapElements.buildings.push(el);
+            });
+        }
+        if (this.minimapElements.bots.length === 0) {
+            for (let i = 0; i < CONFIG.BOT_COUNT; i++) {
+                const el = document.createElement('div');
+                el.className = 'bot-dot';
+                minimap.appendChild(el);
+                this.minimapElements.bots.push(el);
+            }
+        }
+
+        // 2. Update Buildings
+        mapStructure.forEach((rect, i) => {
+            const el = this.minimapElements.buildings[i];
+            const dx = rect.x - px;
+            const dz = rect.z - pz;
+            
+            if (Math.abs(dx) < radarRadius + rect.w/2 && Math.abs(dz) < radarRadius + rect.d/2) {
+                el.classList.remove('hidden');
+                el.style.left = `${(dx / (radarRadius * 2) + 0.5) * 100}%`;
+                el.style.top = `${(dz / (radarRadius * 2) + 0.5) * 100}%`;
+                el.style.width = `${(rect.w / (radarRadius * 2)) * 100}%`;
+                el.style.height = `${(rect.d / (radarRadius * 2)) * 100}%`;
+            } else {
+                el.classList.add('hidden');
             }
         });
 
-        bots.forEach(bot => {
-            if (bot.userData.isDead) return;
+        // 3. Update Bots
+        bots.forEach((bot, i) => {
+            const el = this.minimapElements.bots[i];
+            if (!el) return;
             const dx = bot.position.x - px;
             const dz = bot.position.z - pz;
-            if (Math.abs(dx) < radarRadius && Math.abs(dz) < radarRadius) {
-                const dot = document.createElement('div');
-                dot.className = 'bot-dot';
-                dot.style.left = `${(dx / (radarRadius * 2) + 0.5) * 100}%`;
-                dot.style.top = `${(dz / (radarRadius * 2) + 0.5) * 100}%`;
-                minimap.appendChild(dot);
+            
+            if (!bot.userData.isDead && Math.abs(dx) < radarRadius && Math.abs(dz) < radarRadius) {
+                el.classList.remove('hidden');
+                el.style.left = `${(dx / (radarRadius * 2) + 0.5) * 100}%`;
+                el.style.top = `${(dz / (radarRadius * 2) + 0.5) * 100}%`;
+                if (bot.userData.botType === 'SNIPER') el.style.background = '#cc00ff';
+                else el.style.background = '#ff4400';
+            } else {
+                el.classList.add('hidden');
             }
         });
 
