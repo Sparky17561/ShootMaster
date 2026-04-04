@@ -1,11 +1,12 @@
 export const CONFIG = {
     // Movement
-    WALK_SPEED: 96.0,
-    ACCELERATION: 15.0,
+    WALK_SPEED: 60.0,
+    ACCELERATION: 20.0,
     FRICTION: 6.0,
     AIR_RESISTANCE: 1.5,
     JUMP_FORCE: 35.0,
     GRAVITY: 100.0,
+    MAP_BOUNDARY: 49.0, // Ground is 100x100 (-50 to 50)
 
     // Crouch Mechanic
     CROUCH_HEIGHT: 1.0,
@@ -16,9 +17,9 @@ export const CONFIG = {
     SLIDE_MAX_DURATION: 0.8,
     SLIDE_COOLDOWN: 1.5,
     SLIDE_FRICTION: 2.0,
-    SLIDE_THRESHOLD: 60.0, // Lowered to make sliding easier to trigger
-    SLIDE_FOV_MOD: 10,       // Gain 10 FOV during slide
-    SLIDE_TILT: 0.05,       // Camera tilt in radians
+    SLIDE_THRESHOLD: 40.0, 
+    SLIDE_FOV_MOD: 10,       
+    SLIDE_TILT: 0.05,       
 
     // Step-Up
     STEP_HEIGHT: 0.5,
@@ -30,10 +31,10 @@ export const CONFIG = {
     // Trackpad Mode
     TRACKPAD_SENSITIVITY: 0.0012,
     TRACKPAD_SMOOTHING: 0.1,
-    DELTA_SPIKE_THRESHOLD: 100, // Ignore movement deltas larger than 100px
+    DELTA_SPIKE_THRESHOLD: 100, 
 
     // Gameplay Loop
-    DAMAGE_PER_SHOT: 100,
+    DAMAGE_PER_SHOT: 34, // 3 shots for 100HP
     RESPAWN_DELAY: 2.0,
     MIN_SPAWN_DISTANCE: 15.0,
     DEATH_ANIMATION_SPEED: 10.0,
@@ -47,11 +48,32 @@ export const CONFIG = {
     RECOIL_RECOVERY_SPEED: 5,
     
     // Hit Marker
-    HIT_COOLDOWN: 0.1, // 100ms
+    HIT_COOLDOWN: 0.1, 
+
+    // Bots
+    BOT_COUNT: 5,
+    BOT_HEALTH: 100,
+    BOT_SPEED: 5.0,
+    BOT_STRAFE_SPEED: 3.5,
+    BOT_DETECTION_RANGE: 30.0,
+    BOT_STOP_DISTANCE: 12.0,
+    BOT_SHOOT_INTERVAL: 2.5,
+    BOT_REACTION_MIN: 0.4,
+    BOT_REACTION_MAX: 1.2,
+    BOT_DAMAGE: 15,
+    BOT_AIM_SPREAD: 0.1, // Radians of spread
+    BOT_ROTATION_SPEED: 8.0,
+    BOT_HEIGHT: 2.2,
+    BOT_RADIUS: 0.7,
+    BOT_AIM_TIME: 0.8,
+    LASER_COLOR: 0xff0000,
+    TRACER_DURATION: 0.15,
+    TRACER_COLOR: 0xffff00,
 
     // Mechanics
     PLAYER_HEIGHT: 1.8,
-    PLAYER_WIDTH: 0.6,
+    PLAYER_WIDTH: 0.8,
+    PLAYER_RESPAWN_TIME: 3.0,
     FIXED_UPDATE_RATE: 1 / 60, // 60Hz
 };
 

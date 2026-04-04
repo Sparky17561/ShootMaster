@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { CONFIG } from './Config.js';
-import { targets } from './world.js';
+import { targets, bots } from './world.js';
 
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2(0, 0);
@@ -57,9 +57,11 @@ export function handleShooting(game) {
     if (weapon.cooldown > 0) return;
     weapon.cooldown = 0.1; // 10 shots per second
 
-    // Raycast against targets only
+    // Raycast against targets and bots
+    if (playerState.isDead) return;
     raycaster.setFromCamera(mouse, camera);
-    const intersects = raycaster.intersectObjects(targets, false);
+    const shootables = [...targets, ...bots];
+    const intersects = raycaster.intersectObjects(shootables, false);
 
     if (intersects.length > 0) {
         const target = intersects[0].object;

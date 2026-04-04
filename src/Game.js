@@ -3,7 +3,7 @@ import { CONFIG } from './Config.js';
 import { updateInput, initInput } from './input.js';
 import { updatePhysics } from './physics.js';
 import { handleShooting, updateWeapon } from './weapon.js';
-import { initWorld, updateWorld } from './world.js';
+import { initWorld, updateWorld, updateBots } from './world.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { initWeapon } from './weapon.js';
 class Game {
@@ -35,7 +35,9 @@ class Game {
             lastHitTime: 0,
             recoilOffset: { x: 0, y: 0 },
             currentFOV: CONFIG.FOV_BASE,
-            cameraTilt: 0
+            cameraTilt: 0,
+            isDead: false,
+            respawnTimer: 0
         };
 
         this.inputBuffer = {
@@ -53,6 +55,8 @@ class Game {
         this.weapon = {
             cooldown: 0
         };
+
+        this.playerHitbox = null;
 
         this.init();
     }
@@ -84,6 +88,12 @@ class Game {
 
         initWeapon(this.scene, this.camera);
 
+        // Player Hitbox (Invisible, for bot raycasting)
+        const hitboxGeom = new THREE.BoxGeometry(CONFIG.PLAYER_WIDTH, CONFIG.PLAYER_HEIGHT, CONFIG.PLAYER_WIDTH);
+        const hitboxMat = new THREE.MeshBasicMaterial({ visible: false });
+        this.playerHitbox = new THREE.Mesh(hitboxGeom, hitboxMat);
+        this.scene.add(this.playerHitbox);
+
         // Window resize
         window.addEventListener('resize', () => this.onWindowResize());
 
@@ -112,6 +122,22 @@ class Game {
 
         // 4. World Logic (Hit feedback cleanup)
         updateWorld(this, dt);
+
+        // 5. Bot AI Logic
+        this.playerHitbox.position.set(
+            this.playerState.position.x,
+            this.playerState.position.y - CONFIG.PLAYER_HEIGHT / 2, // Center of box
+            this.playerState.position.z
+        );
+        updateBots(this, dt, this.playerHitbox);
+
+        // 6. Player Respawn Timer
+        if (this.playerState.isDead) {
+            this.playerState.respawnTimer -= dt;
+            if (this.playerState.respawnTimer <= 0) {
+                this.respawnPlayer();
+            }
+        }
     }
 
     animate() {
@@ -153,7 +179,28 @@ class Game {
     }
 
     takeDamage(amount) {
+        if (this.playerState.isDead) return;
         this.playerState.health = Math.max(0, this.playerState.health - amount);
+        if (this.playerState.health <= 0) {
+            this.die();
+        }
+    }
+
+    die() {
+        this.playerState.isDead = true;
+        this.playerState.respawnTimer = CONFIG.PLAYER_RESPAWN_TIME;
+        document.body.classList.add('dead');
+        // Disable input effects
+        this.playerState.velocity.x = 0;
+        this.playerState.velocity.z = 0;
+    }
+
+    respawnPlayer() {
+        this.playerState.isDead = false;
+        this.playerState.health = 100;
+        this.playerState.position = { x: 0, y: CONFIG.PLAYER_HEIGHT, z: 10 };
+        this.playerState.velocity = { x: 0, y: 0, z: 0 };
+        document.body.classList.remove('dead');
     }
 
     updateHUD(dt) {

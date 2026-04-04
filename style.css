@@ -184,3 +184,40 @@ body.paused #crosshair,
 body.paused #hud {
     display: none !important;
 }
+#death-screen {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 100vw;
+    height: 100vh;
+    background: rgba(139, 0, 0, 0.8);
+    display: none;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    pointer-events: none;
+    z-index: 150;
+    font-size: 64px;
+    font-weight: 900;
+    color: #fff;
+    text-shadow: 0 0 20px #000;
+    letter-spacing: 15px;
+}
+
+#death-screen span {
+    font-size: 18px;
+    letter-spacing: 2px;
+    margin-top: 20px;
+    opacity: 0.8;
+}
+
+body.dead #death-screen {
+    display: flex !important;
+}
+
+body.dead #crosshair,
+body.dead #hud {
+    display: none !important;
+}

@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { CONFIG } from './Config.js';
+import { obstacles } from './world.js';
 
 const tempVec = new THREE.Vector3();
 const moveDir = new THREE.Vector3();
@@ -107,25 +108,58 @@ export function updatePhysics(game, dt) {
     }
 
     // 4. Gravity & Jump
-    if (!playerState.isGrounded) {
-        playerState.velocity.y -= CONFIG.GRAVITY * dt;
-    } else {
-        playerState.velocity.y = Math.max(0, playerState.velocity.y);
-        if (inputBuffer.jump) {
-            playerState.velocity.y = CONFIG.JUMP_FORCE;
-            playerState.isGrounded = false;
-        }
+    if (playerState.isGrounded && inputBuffer.jump) {
+        playerState.velocity.y = CONFIG.JUMP_FORCE;
+        playerState.isGrounded = false;
     }
-
     // 5. Apply velocity to position
     playerState.position.x += playerState.velocity.x * dt;
     playerState.position.y += playerState.velocity.y * dt;
     playerState.position.z += playerState.velocity.z * dt;
 
-    // 6. Basic Ground Collision + Step-Up logic
-    const targetHeight = playerState.isCrouching ? CONFIG.CROUCH_HEIGHT : CONFIG.PLAYER_HEIGHT;
+    // 6. Collision & Boundary Handling
     
-    // Smoothly adjust player Y for crouch/stand
+    // A. Map Boundaries (+/- 50)
+    const boundary = CONFIG.MAP_BOUNDARY;
+    if (Math.abs(playerState.position.x) > boundary) {
+        playerState.position.x = Math.sign(playerState.position.x) * boundary;
+        playerState.velocity.x = 0;
+    }
+    if (Math.abs(playerState.position.z) > boundary) {
+        playerState.position.z = Math.sign(playerState.position.z) * boundary;
+        playerState.velocity.z = 0;
+    }
+
+    // B. Obstacle Collisions (AABB)
+    const playerHalfWidth = CONFIG.PLAYER_WIDTH / 2;
+    const playerMinX = playerState.position.x - playerHalfWidth;
+    const playerMaxX = playerState.position.x + playerHalfWidth;
+    const playerMinZ = playerState.position.z - playerHalfWidth;
+    const playerMaxZ = playerState.position.z + playerHalfWidth;
+
+    obstacles.forEach(obstacle => {
+        const box = new THREE.Box3().setFromObject(obstacle);
+        
+        // Check for overlap on X and Z
+        const overlapX = Math.min(playerMaxX, box.max.x) - Math.max(playerMinX, box.min.x);
+        const overlapZ = Math.min(playerMaxZ, box.max.z) - Math.max(playerMinZ, box.min.z);
+
+        if (overlapX > 0 && overlapZ > 0) {
+            // Resolve along the shallowest axis
+            if (overlapX < overlapZ) {
+                const dir = playerState.position.x > (box.min.x + box.max.x) / 2 ? 1 : -1;
+                playerState.position.x += overlapX * dir;
+                playerState.velocity.x = 0;
+            } else {
+                const dir = playerState.position.z > (box.min.z + box.max.z) / 2 ? 1 : -1;
+                playerState.position.z += overlapZ * dir;
+                playerState.velocity.z = 0;
+            }
+        }
+    });
+
+    // 7. Ground / Height Handling
+    const targetHeight = playerState.isCrouching ? CONFIG.CROUCH_HEIGHT : CONFIG.PLAYER_HEIGHT;
     if (playerState.isGrounded) {
         playerState.position.y = THREE.MathUtils.lerp(playerState.position.y, targetHeight, 10 * dt);
     }
@@ -135,8 +169,6 @@ export function updatePhysics(game, dt) {
         playerState.isGrounded = true;
     } else {
         playerState.isGrounded = false;
+        playerState.velocity.y -= CONFIG.GRAVITY * dt;
     }
-
-    // 7. Simple Obstacle Collision (TBI in World)
-    // We update this in a future step when world structure is finalized
 }
