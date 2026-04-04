@@ -1,223 +1,339 @@
+/* GLOBAL BASE */
 body {
     margin: 0;
     padding: 0;
     overflow: hidden;
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    font-family: 'Outfit', 'Segoe UI', sans-serif;
     background: #000;
+    color: #fff;
 }
 
 #game-container {
     width: 100vw;
     height: 100vh;
     position: relative;
+    background: #000;
 }
 
-/* Crosshair Style */
+/* -------------------------------------------------------------------------- */
+/* HUD SYSTEM V3 - ABSOLUTE POSITIONING FOR STABILITY                        */
+/* -------------------------------------------------------------------------- */
+
+#hud-v2 {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 20;
+}
+
+.hud-group {
+    position: absolute;
+    background: rgba(0, 0, 0, 0.7);
+    padding: 15px 20px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    border-radius: 12px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+}
+
+/* TOP RIGHT: Stats */
+.top-right {
+    top: 30px;
+    right: 30px;
+    min-width: 180px;
+    text-align: right;
+    color: #00ff44;
+    font-size: 14px;
+    line-height: 1.4;
+}
+
+#event-feed {
+    margin-top: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.event-item {
+    font-size: 12px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    animation: slide-in 0.3s ease-out forwards;
+}
+
+@keyframes slide-in { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
+
+/* BOTTOM LEFT: Health */
+.bottom-left {
+    bottom: 30px;
+    left: 30px;
+    width: 250px;
+}
+
+#minimap-container {
+    width: 100%;
+    height: 140px;
+    background: rgba(0, 0, 0, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    margin-bottom: 15px;
+    position: relative;
+    overflow: hidden;
+}
+
+#minimap-player {
+    position: absolute;
+    width: 6px;
+    height: 6px;
+    background: #00ff44;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    box-shadow: 0 0 5px #00ff44;
+    z-index: 5;
+}
+
+.bot-dot {
+    position: absolute;
+    width: 4px;
+    height: 4px;
+    background: #ff4444;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 4;
+}
+
+.obstacle-dot {
+    position: absolute;
+    background: rgba(255, 255, 255, 0.15);
+    transform: translate(-50%, -50%);
+    z-index: 2;
+}
+
+.stat-label {
+    font-size: 10px;
+    letter-spacing: 2px;
+    margin-bottom: 5px;
+    color: #aaa;
+    text-transform: uppercase;
+}
+
+#player-hp-val {
+    font-size: 32px;
+    font-weight: 900;
+    color: #fff;
+    margin-top: -5px;
+}
+
+/* BOTTOM RIGHT: Ammo */
+.bottom-right {
+    bottom: 30px;
+    right: 30px;
+    width: 280px;
+    text-align: right;
+}
+
+#weapon-name {
+    font-size: 14px;
+    font-weight: 800;
+    color: #ffaa00;
+    margin-bottom: 2px;
+}
+
+.ammo-info {
+    font-size: 36px;
+    font-weight: 900;
+    margin-top: -5px;
+}
+
+.ammo-info span#ammo-reserve {
+    font-size: 20px;
+    opacity: 0.6;
+}
+
+/* BARS */
+.bar-container {
+    width: 100%;
+    height: 8px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    overflow: hidden;
+    margin: 8px 0;
+}
+
+.bar-fill {
+    height: 100%;
+    width: 100%;
+    transition: width 0.3s cubic-bezier(0.1, 0.9, 0.2, 1), background 0.5s;
+}
+
+.health-high { background: linear-gradient(90deg, #00ff44, #00cc33); }
+.health-med { background: linear-gradient(90deg, #ffcc00, #ffaa00); }
+.health-low { background: linear-gradient(90deg, #ff4444, #cc0000); animation: hp-pulse 0.5s infinite alternate; }
+
+.ammo-active { background: linear-gradient(90deg, #ffaa00, #ffcc00); }
+.ammo-empty { background: #ff4444; animation: hp-pulse 0.2s infinite; }
+
+@keyframes hp-pulse { from { opacity: 0.5; } to { opacity: 1; } }
+
+/* INVENTORY BAR */
+#inventory-bar {
+    position: absolute;
+    bottom: 35px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 15px;
+}
+
+.inv-slot {
+    width: 45px;
+    height: 45px;
+    background: rgba(0, 0, 0, 0.6);
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-weight: 900;
+    font-size: 18px;
+    transition: all 0.2s cubic-bezier(0.18, 0.9, 0.32, 1.2);
+}
+
+.inv-slot.active {
+    background: rgba(255, 170, 0, 0.2);
+    border-color: #ffaa00;
+    transform: translateY(-8px) scale(1.1);
+    box-shadow: 0 10px 20px rgba(255, 170, 0, 0.3);
+}
+
+/* ACTION BANNER */
+#action-banner {
+    position: absolute;
+    top: 60%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    padding: 12px 40px;
+    background: rgba(255, 170, 0, 0.15);
+    border: 2px solid #ffaa00;
+    color: #ffaa00;
+    font-size: 24px;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 4px;
+    border-radius: 6px;
+    animation: banner-pulse 0.8s infinite alternate;
+}
+#action-banner.hidden { display: none; }
+@keyframes banner-pulse { from { opacity: 0.6; transform: translate(-50%, -50%) scale(1); } to { opacity: 1; transform: translate(-50%, -50%) scale(1.05); } }
+
+/* -------------------------------------------------------------------------- */
+/* WORLD OVERLAYS                                                            */
+/* -------------------------------------------------------------------------- */
+
+/* DAMAGE FLASH */
+#damage-flash {
+    position: absolute;
+    inset: 0;
+    background: rgba(255, 0, 0, 0.5);
+    opacity: 0;
+    pointer-events: none;
+    z-index: 100;
+}
+#damage-flash.active {
+    opacity: 1;
+}
+
+/* CROSSHAIR */
 #crosshair {
     position: absolute;
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    width: 20px;
-    height: 20px;
+    width: 60px;
+    height: 60px;
     pointer-events: none;
     z-index: 10;
+    --spread: 10px;
 }
-
-#crosshair .dot {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    width: 2px;
-    height: 2px;
-    background: #00ff00;
-    border-radius: 50%;
-    transform: translate(-50%, -50%);
-}
-
 #crosshair .line {
     position: absolute;
-    background: #00ff00;
+    background: #00ff44;
+}
+#crosshair .top { width: 2px; height: 10px; top: calc(30px - var(--spread) - 10px); left: 50%; transform: translateX(-50%); }
+#crosshair .bottom { width: 2px; height: 10px; bottom: calc(30px - var(--spread) - 10px); left: 50%; transform: translateX(-50%); }
+#crosshair .left { width: 10px; height: 2px; left: calc(30px - var(--spread) - 10px); top: 50%; transform: translateY(-50%); }
+#crosshair .right { width: 10px; height: 2px; right: calc(30px - var(--spread) - 10px); top: 50%; transform: translateY(-50%); }
+#crosshair .dot {
+    position: absolute; top: 50%; left: 50%;
+    width: 2px; height: 2px; background: #00ff44;
+    transform: translate(-50%, -50%);
 }
 
-#crosshair .top, #crosshair .bottom {
-    width: 1px;
-    height: 6px;
-    left: 50%;
-    transform: translateX(-50%);
-}
-
-#crosshair .left, #crosshair .right {
-    width: 6px;
-    height: 1px;
-    top: 50%;
-    transform: translateY(-50%);
-}
-
-#crosshair .top { top: 0; }
-#crosshair .bottom { bottom: 0; }
-#crosshair .left { left: 0; }
-#crosshair .right { right: 0; }
-
-/* Hit Marker Style */
+/* HIT MARKER */
 #hit-marker {
     position: absolute;
-    top: 50%;
-    left: 50%;
-    width: 24px;
-    height: 24px;
+    top: 50%; left: 50%;
+    width: 24px; height: 24px;
     transform: translate(-50%, -50%) rotate(45deg);
     pointer-events: none;
-    transition: opacity 0.1s ease-out;
 }
+#hit-marker.hidden { opacity: 0; }
+#hit-marker div { position: absolute; background: #fff; box-shadow: 0 0 5px #fff; }
+#hit-marker .m1, #hit-marker .m3 { width: 2px; height: 8px; left: 50%; transform: translateX(-50%); }
+#hit-marker .m2, #hit-marker .m4 { width: 8px; height: 2px; top: 50%; transform: translateY(-50%); }
+#hit-marker .m1 { top: -2px; } #hit-marker .m3 { bottom: -2px; }
+#hit-marker .m2 { right: -2px; } #hit-marker .m4 { left: -2px; }
 
-#hit-marker.hidden {
-    opacity: 0;
-    display: block !important; /* Keep in DOM for transition */
-    pointer-events: none;
+@keyframes hit-ping {
+    0% { transform: translate(-50%, -50%) rotate(45deg) scale(1.5); opacity: 1; }
+    100% { transform: translate(-50%, -50%) rotate(45deg) scale(1.0); opacity: 0; }
 }
+.hit-animate { animation: hit-ping 0.15s ease-out forwards; }
 
-#hit-marker div {
-    position: absolute;
-    background: #ff3333;
-}
-
-#hit-marker .m1, #hit-marker .m3 {
-    width: 2px;
-    height: 8px;
-    left: 50%;
-    transform: translateX(-50%);
-}
-
-#hit-marker .m2, #hit-marker .m4 {
-    width: 8px;
-    height: 2px;
-    top: 50%;
-    transform: translateY(-50%);
-}
-
-#hit-marker .m1 { top: -2px; }
-#hit-marker .m3 { bottom: -2px; }
-#hit-marker .m2 { right: -2px; }
-#hit-marker .m4 { left: -2px; }
-
-@keyframes hit-fade {
-    0% { opacity: 1; transform: translate(-50%, -50%) rotate(45deg) scale(1.2); }
-    100% { opacity: 0; transform: translate(-50%, -50%) rotate(45deg) scale(1.0); }
-}
-
-.hit-animate {
-    animation: hit-fade 0.15s ease-out forwards;
-}
-
-/* HUD Style */
-#hud {
-    position: absolute;
-    top: 20px;
-    left: 20px;
-    color: #00ff00;
-    pointer-events: none;
-    z-index: 20;
-    text-shadow: 1px 1px 2px #000;
-    font-family: 'Courier New', Courier, monospace;
-}
-
-#fps-counter, #speed-meter, #slide-status, #control-mode, #player-hp, #score-display {
-    font-size: 14px;
-    font-weight: bold;
-    margin-bottom: 4px;
-}
-
-#player-hp { color: #ff5555; }
-#score-display { color: #ffffff; }
-
-#mode-hint {
-    font-size: 11px;
-    color: rgba(0, 255, 0, 0.6);
-    margin-bottom: 10px;
-}
-
-#debug-info {
-    margin-top: 10px;
-    font-size: 12px;
-}
-
-#debug-info.hidden {
-    display: none;
-}
+/* -------------------------------------------------------------------------- */
+/* STATE OVERLAYS (PAUSE & DEATH)                                            */
+/* -------------------------------------------------------------------------- */
 
 #instruction {
     position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: 100vw;
-    height: 100vh;
-    background: rgba(0, 0, 0, 0.7);
-    display: flex;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.8);
+    display: none;
     flex-direction: column;
     justify-content: center;
     align-items: center;
-    text-align: center;
-    pointer-events: none;
-    z-index: 100;
+    z-index: 200;
+    color: #00ff44;
     font-size: 32px;
-    color: #00ff00;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 4px;
 }
+#instruction span { font-size: 16px; margin-top: 15px; opacity: 0.6; }
+body.paused #instruction { display: flex; }
 
-#instruction span {
-    font-size: 16px;
-    margin-top: 10px;
-    opacity: 0.8;
-}
-
-/* Pause Overlay Visibility */
-#instruction {
-    display: none; /* Hidden by default */
-}
-
-body.paused #instruction {
-    display: flex !important;
-}
-
-body.paused #crosshair,
-body.paused #hud {
-    display: none !important;
-}
 #death-screen {
     position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: 100vw;
-    height: 100vh;
-    background: rgba(139, 0, 0, 0.8);
+    inset: 0;
+    background: rgba(139, 0, 0, 0.9);
     display: none;
     flex-direction: column;
     justify-content: center;
     align-items: center;
-    text-align: center;
-    pointer-events: none;
-    z-index: 150;
+    z-index: 210;
+    color: #fff;
     font-size: 64px;
     font-weight: 900;
-    color: #fff;
-    text-shadow: 0 0 20px #000;
-    letter-spacing: 15px;
+    letter-spacing: 20px;
+    text-shadow: 0 0 30px #000;
 }
+#death-screen span { font-size: 20px; letter-spacing: 5px; margin-top: 20px; opacity: 0.8; }
+body.dead #death-screen { display: flex; }
 
-#death-screen span {
-    font-size: 18px;
-    letter-spacing: 2px;
-    margin-top: 20px;
-    opacity: 0.8;
-}
-
-body.dead #death-screen {
-    display: flex !important;
-}
-
-body.dead #crosshair,
-body.dead #hud {
+/* Hide HUD when dead or paused */
+body.paused #hud-v2, body.paused #crosshair,
+body.dead #hud-v2, body.dead #crosshair {
     display: none !important;
 }

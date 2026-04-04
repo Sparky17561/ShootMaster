@@ -1,49 +1,88 @@
 import * as THREE from 'three';
 import { CONFIG } from './Config.js';
-import { targets, bots } from './world.js';
+import { targets, bots, spawnTracer } from './world.js';
 
 const raycaster = new THREE.Raycaster();
-const mouse = new THREE.Vector2(0, 0);
+const _camDir = new THREE.Vector3();
+const _spreadDir = new THREE.Vector3();
+const _right = new THREE.Vector3();
+const _up = new THREE.Vector3();
 
 // CACHE DOM ELEMENT
 const hitMarker = document.getElementById('hit-marker');
 
 // REUSE LIGHT
 let muzzleFlash = null;
+let trajectoryLine = null;
 
 export function initWeapon(scene, camera) {
     muzzleFlash = new THREE.PointLight(0xffaa00, 0, 5);
     muzzleFlash.visible = false;
     scene.add(muzzleFlash);
+
+    // Trajectory Line for Grenades
+    const geometry = new THREE.BufferGeometry();
+    const material = new THREE.LineDashedMaterial({ 
+        color: 0xffaa00, 
+        dashSize: 0.5, 
+        gapSize: 0.3 
+    });
+    trajectoryLine = new THREE.Line(geometry, material);
+    trajectoryLine.visible = false;
+    scene.add(trajectoryLine);
 }
 
 export function updateWeapon(game, dt) {
-    const { playerState, inputBuffer } = game;
+    const { playerState, inputBuffer, weapon } = game;
+    const currentWep = playerState.inventory[playerState.currentWeaponIndex];
     
     // 1. ADS (FOV Zoom)
     const targetFOV = playerState.isADS ? CONFIG.FOV_ADS : CONFIG.FOV_BASE;
     playerState.currentFOV += (targetFOV - playerState.currentFOV) * CONFIG.ADS_LERP_SPEED * dt;
 
-    // 2. Fire Logic
-    if (inputBuffer.shoot) {
-        handleShooting(game);
+    // 2. Reloading Logic
+    if (playerState.isReloading) {
+        playerState.reloadTimer -= dt;
+        if (playerState.reloadTimer <= 0) {
+            const needed = currentWep.magSize - currentWep.ammo;
+            const transfer = Math.min(needed, currentWep.reserve);
+            currentWep.ammo += transfer;
+            if (currentWep.reserve !== Infinity) currentWep.reserve -= transfer;
+            playerState.isReloading = false;
+        }
+    } else if (playerState.isReloadingRequested && currentWep.ammo < currentWep.magSize && currentWep.reserve > 0) {
+        playerState.isReloading = true;
+        playerState.reloadTimer = currentWep.reloadTime;
+    }
+
+    // 3. Grenade Aiming
+    if (playerState.isAimingGrenade) {
+        updateGrenadeTrajectory(game);
+    } else if (trajectoryLine && trajectoryLine.visible) {
+        throwGrenade(game);
+        trajectoryLine.visible = false;
+    }
+
+    // 4. Fire Logic
+    if (weapon.cooldown > 0) weapon.cooldown -= dt;
+
+    if (playerState.isShooting && !playerState.isReloading) {
+        if (currentWep.isAutomatic) {
+            if (weapon.cooldown <= 0) handleShooting(game);
+        } else {
+            if (inputBuffer.shoot) handleShooting(game);
+        }
     }
     
-    // Update cooldown
-    if (game.weapon.cooldown > 0) {
-        game.weapon.cooldown -= dt;
-    }
+    // 5. Recoil Recovery
+    const recoverySpeed = 5;
+    playerState.recoilOffset.x *= (1.0 - recoverySpeed * dt);
+    playerState.recoilOffset.y *= (1.0 - recoverySpeed * dt);
 
-    // 3. Recoil Recovery
-    playerState.recoilOffset.x *= (1.0 - CONFIG.RECOIL_RECOVERY_SPEED * dt);
-    playerState.recoilOffset.y *= (1.0 - CONFIG.RECOIL_RECOVERY_SPEED * dt);
+    // 6. Hit Marker Cooldown
+    if (playerState.lastHitTime > 0) playerState.lastHitTime -= dt;
 
-    // 4. Hit Marker Cooldown
-    if (playerState.lastHitTime > 0) {
-        playerState.lastHitTime -= dt;
-    }
-
-    // 5. Fade Muzzle Flash
+    // 7. Fade Muzzle Flash
     if (muzzleFlash && muzzleFlash.visible) {
         muzzleFlash.intensity *= 0.6;
         if (muzzleFlash.intensity < 0.1) muzzleFlash.visible = false;
@@ -51,59 +90,159 @@ export function updateWeapon(game, dt) {
 }
 
 export function handleShooting(game) {
-    const { playerState, inputBuffer, weapon, scene, camera } = game;
+    const { playerState, inputBuffer, weapon, camera } = game;
+    const currentWep = playerState.inventory[playerState.currentWeaponIndex];
     
-    // Cooldown check
+    if (playerState.isDead || playerState.isReloading) return;
     if (weapon.cooldown > 0) return;
-    weapon.cooldown = 0.1; // 10 shots per second
+    if (currentWep.ammo <= 0) {
+        if (currentWep.reserve > 0 && !playerState.isReloading) {
+            playerState.isReloading = true;
+            playerState.reloadTimer = currentWep.reloadTime;
+        }
+        return;
+    }
 
-    // Raycast against targets and bots
-    if (playerState.isDead) return;
-    raycaster.setFromCamera(mouse, camera);
-    const shootables = [...targets, ...bots];
-    const intersects = raycaster.intersectObjects(shootables, false);
+    weapon.cooldown = currentWep.fireRate;
+    currentWep.ammo--;
 
-    if (intersects.length > 0) {
-        const target = intersects[0].object;
+    // PINPOINT WORLD DIRECTION
+    camera.getWorldDirection(_camDir);
+    _right.set(1, 0, 0).applyQuaternion(camera.quaternion);
+    _up.set(0, 1, 0).applyQuaternion(camera.quaternion);
 
-        if (!target.userData.isDead) {
-            // Damage
-            target.userData.health -= CONFIG.DAMAGE_PER_SHOT;
+    // 1. Raycasting
+    const shootables = [];
+    bots.forEach(bot => {
+        if (!bot.userData.isDead) shootables.push(...bot.children);
+    });
+    shootables.push(...targets);
 
-            // Feedback
-            target.material.color.set(0xff0000);
-            target.userData.hitTimer = 0.1;
+    const numPellets = currentWep.pellets || 1;
+    let spread = currentWep.isADS ? 0 : (currentWep.spread || 0.02);
 
-            if (!target.userData.baseScale) target.userData.baseScale = target.scale.x;
-            target.scale.setScalar(target.userData.baseScale * 1.2);
+    for (let i = 0; i < numPellets; i++) {
+        _spreadDir.copy(_camDir);
+        
+        // Apply spread 
+        if (spread > 0) {
+            const sx = (Math.random() - 0.5) * spread;
+            const sy = (Math.random() - 0.5) * spread;
+            _spreadDir.addScaledVector(_right, sx);
+            _spreadDir.addScaledVector(_up, sy);
+            _spreadDir.normalize();
+        }
 
-            // Death
-            if (target.userData.health <= 0) {
-                target.userData.isDead = true;
-                target.userData.respawnTimer = CONFIG.RESPAWN_DELAY;
-                playerState.score += 1;
+        // Offset origin to clear player body and immediate wall clipping
+        const muzzlePos = camera.position.clone().addScaledVector(_camDir, 0.8);
+        raycaster.set(muzzlePos, _spreadDir);
+        
+        const intersects = raycaster.intersectObjects(shootables, false);
+
+        if (intersects.length > 0) {
+            const hitObj = intersects[0].object;
+            const bot = hitObj.userData.parentBot || hitObj;
+            if (bot.userData.isDead) continue; // Safety guard for multi-part bots
+            
+            let damage = currentWep.damage;
+            let isHeadshot = false;
+
+            if (hitObj.userData.isHead) {
+                damage = 999;
+                isHeadshot = true;
             }
 
-            // Hit Marker UI
+            bot.userData.health -= damage;
+
+            // Flash White (Recursive for Group)
+            flashBot(bot, true); 
+            bot.userData.hitTimer = 0.1;
+            
+            if (bot.userData.health <= 0) {
+                bot.userData.isDead = true;
+                bot.userData.respawnTimer = CONFIG.RESPAWN_DELAY;
+                playerState.score += 1;
+                game.addEvent(isHeadshot ? "HEADSHOT KILL!" : "BOT KILLED", isHeadshot ? "#ffaa00" : "#0f4");
+                
+                // LAY DOWN - Physical Rotate
+                bot.rotation.x = -Math.PI / 2;
+                bot.position.y = 0.5;
+            }
+
             if (playerState.lastHitTime <= 0) {
-                hitMarker.classList.remove('hidden');
-                hitMarker.classList.remove('hit-animate');
+                hitMarker.classList.remove('hidden', 'hit-animate');
                 void hitMarker.offsetWidth;
                 hitMarker.classList.add('hit-animate');
                 playerState.lastHitTime = CONFIG.HIT_COOLDOWN;
             }
         }
+
+        // Tracer
+        const dist = intersects.length > 0 ? intersects[0].distance : 100;
+        const tracerStart = camera.position.clone();
+        const tracerEnd = tracerStart.clone().addScaledVector(_spreadDir, dist);
+        spawnTracer(tracerStart, tracerEnd, game.scene);
     }
 
-    // Apply Recoil & Shake (Managed by Game.js render loop)
-    playerState.recoilOffset.y += CONFIG.RECOIL_KICK;
-    playerState.recoilOffset.x += (Math.random() - 0.5) * CONFIG.RECOIL_RANDOM_HORIZONTAL;
+    // 2. Feedback
+    const recoilMod = (playerState.isCrouching ? 0.4 : 1.0) * (playerState.isADS ? 0.5 : 1.0);
+    playerState.recoilOffset.y += currentWep.recoil * recoilMod;
+    playerState.recoilOffset.x += (Math.random() - 0.5) * (currentWep.recoil * 0.5) * recoilMod;
 
-    // Muzzle Flash
+    playerState.cameraShake.x += (Math.random() - 0.5) * currentWep.recoil * 2 * recoilMod;
+    playerState.cameraShake.y += (Math.random() - 0.5) * currentWep.recoil * 2 * recoilMod;
+
     muzzleFlash.position.copy(camera.position);
     muzzleFlash.intensity = 3;
     muzzleFlash.visible = true;
 
-    // Consume input
-    inputBuffer.shoot = false;
+    if (!currentWep.isAutomatic) inputBuffer.shoot = false;
+}
+
+function flashBot(bot, isWhite) {
+    bot.traverse(child => {
+        if (child.isMesh) {
+            if (isWhite) {
+                child.userData.oldColor = child.material.color.getHex();
+                child.material.color.set(0xffffff);
+            } else if (child.userData.oldColor !== undefined) {
+                child.material.color.set(child.userData.oldColor);
+            }
+        }
+    });
+}
+
+function updateGrenadeTrajectory(game) {
+    if (!trajectoryLine) return;
+    trajectoryLine.visible = true;
+
+    const points = [];
+    const p0 = game.camera.position.clone();
+    const v0 = new THREE.Vector3(0, 0, -1).applyQuaternion(game.camera.quaternion).multiplyScalar(CONFIG.WEAPONS.GRENADE.tossForce);
+    const g = new THREE.Vector3(0, CONFIG.GRENADE_GRAVITY, 0);
+
+    for (let i = 0; i < CONFIG.TRAJECTORY_POINTS; i++) {
+        const t = i * 0.1;
+        const p = p0.clone().addScaledVector(v0, t).addScaledVector(g, 0.5 * t * t);
+        points.push(p);
+    }
+
+    trajectoryLine.geometry.setFromPoints(points);
+    trajectoryLine.computeLineDistances();
+}
+
+function throwGrenade(game) {
+    if (game.playerState.grenades <= 0) {
+        game.addEvent("OUT OF GRENADES", "#f44");
+        return;
+    }
+    game.playerState.grenades--;
+    
+    const p0 = game.camera.position.clone();
+    const v0 = new THREE.Vector3(0, 0, -1).applyQuaternion(game.camera.quaternion).multiplyScalar(CONFIG.WEAPONS.GRENADE.tossForce);
+    
+    import('./world.js').then(world => {
+        world.spawnGrenade(p0, v0, game);
+        game.addEvent("GRENADE AWAY!");
+    });
 }

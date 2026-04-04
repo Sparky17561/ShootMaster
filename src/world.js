@@ -10,19 +10,23 @@ const _zeroVec = new THREE.Vector3(0, 0, 0);
 const _botRaycaster = new THREE.Raycaster();
 const _playerPos = new THREE.Vector3();
 
-export function initWorld(scene) {
-    // 1. Lighting
+export function initWorld(scene, game) {
+    // 1. Lighting & Fog
     const ambient = new THREE.AmbientLight(0x404040); 
     scene.add(ambient);
 
     const directional = new THREE.DirectionalLight(0xffffff, 1.2);
-    directional.position.set(10, 20, 10);
+    directional.position.set(20, 40, 20);
     directional.castShadow = true;
+    directional.shadow.mapSize.width = 1024;
+    directional.shadow.mapSize.height = 1024;
     scene.add(directional);
 
+    scene.fog = new THREE.Fog(0x050505, 10, 130);
+
     // 2. Ground
-    const groundGeometry = new THREE.PlaneGeometry(100, 100);
-    const groundMaterial = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.9 });
+    const groundGeometry = new THREE.PlaneGeometry(300, 300);
+    const groundMaterial = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.9 });
     const ground = new THREE.Mesh(groundGeometry, groundMaterial);
     ground.rotation.x = -Math.PI / 2;
     ground.receiveShadow = true;
@@ -33,10 +37,10 @@ export function initWorld(scene) {
     const wallHeight = 10;
 
     const wallGeoms = [
-        { size: [100, wallHeight, 1], pos: [0, wallHeight / 2, -50] }, // Back
-        { size: [100, wallHeight, 1], pos: [0, wallHeight / 2, 50] },  // Front
-        { size: [1, wallHeight, 100], pos: [-50, wallHeight / 2, 0] }, // Left
-        { size: [1, wallHeight, 100], pos: [50, wallHeight / 2, 0] }   // Right
+        { size: [300, wallHeight, 1], pos: [0, wallHeight / 2, -150] }, // Back
+        { size: [300, wallHeight, 1], pos: [0, wallHeight / 2, 150] },  // Front
+        { size: [1, wallHeight, 300], pos: [-150, wallHeight / 2, 0] }, // Left
+        { size: [1, wallHeight, 300], pos: [150, wallHeight / 2, 0] }   // Right
     ];
 
     wallGeoms.forEach(cfg => {
@@ -47,35 +51,95 @@ export function initWorld(scene) {
     });
 
     // 4. Platforms & Covers
-    const platformMaterial = new THREE.MeshStandardMaterial({ color: 0x555555 });
+    const platformMaterial = new THREE.MeshStandardMaterial({ color: 0x333333, roughness: 0.8 });
+    const accentMaterial = new THREE.MeshStandardMaterial({ color: 0x444444, metalness: 0.5 });
+    
     const platformConfigs = [
-        { size: [10, 2, 10], pos: [15, 1, 15] },
-        { size: [8, 4, 8], pos: [-20, 2, -20] },
-        { size: [12, 1, 6], pos: [0, 0.5, -30] },
-        { size: [5, 3, 5], pos: [30, 1.5, -10] }
+        { size: [14, 2, 14], pos: [20, 1, 20] },
+        { size: [10, 5, 10], pos: [-25, 2.5, -25] },
+        { size: [40, 1.5, 20], pos: [0, 5, -50] }, // Large 2nd floor balcony
+        { size: [8, 4, 8], pos: [35, 2, -15] },
+        // Tactical Pillars
+        { size: [2, 10, 2], pos: [10, 5, 10], mat: accentMaterial },
+        { size: [2, 10, 2], pos: [-10, 5, 10], mat: accentMaterial },
+        { size: [2, 10, 2], pos: [10, 5, -10], mat: accentMaterial },
+        { size: [2, 10, 2], pos: [-10, 5, -10], mat: accentMaterial },
+        { size: [2, 10, 2], pos: [40, 5, 40], mat: accentMaterial },
+        { size: [2, 10, 2], pos: [-40, 5, -40], mat: accentMaterial },
+        { size: [2, 10, 2], pos: [40, 5, -40], mat: accentMaterial },
+        { size: [2, 10, 2], pos: [-40, 5, 40], mat: accentMaterial },
+        // Crate Stacks
+        { size: [4, 4, 4], pos: [0, 2, -25] },
+        { size: [3, 6, 3], pos: [-30, 3, 5] },
+        { size: [5, 2, 5], pos: [-5, 1, 0] },
+        // Extra Obstacles for CQB
+        { size: [3, 8, 3], pos: [50, 4, 50], mat: accentMaterial },
+        { size: [3, 8, 3], pos: [-50, 4, 50], mat: accentMaterial },
+        { size: [3, 8, 3], pos: [50, 4, -50], mat: accentMaterial },
+        { size: [3, 8, 3], pos: [-50, 4, -50], mat: accentMaterial },
+        { size: [6, 4, 6], pos: [80, 2, 20] },
+        { size: [6, 4, 6], pos: [-80, 2, -20] },
+        { size: [2, 12, 2], pos: [0, 6, -100], mat: accentMaterial },
+        { size: [4, 4, 4], pos: [-40, 2, 80] },
+        { size: [4, 4, 4], pos: [40, 2, 80] }
     ];
 
     platformConfigs.forEach(cfg => {
-        const platform = new THREE.Mesh(new THREE.BoxGeometry(...cfg.size), platformMaterial);
-        platform.position.set(...cfg.pos);
-        scene.add(platform);
-        obstacles.push(platform);
+        const wall = new THREE.Mesh(new THREE.BoxGeometry(...cfg.size), cfg.mat || platformMaterial);
+        wall.position.set(...cfg.pos);
+        wall.castShadow = true;
+        wall.receiveShadow = true;
+        scene.add(wall);
+        obstacles.push(wall);
     });
+
+    // 4.5. Urban Complexes
+    // Complex A: Central Apartment (-40, -40)
+    createBuilding(scene, -40, -40, 25, 20, 8, platformMaterial); 
+    createBuilding(scene, -40, -40, 20, 15, 14, accentMaterial); 
+    createStairs(scene, new THREE.Vector3(-40, 0, -25), 20, 0.2, 8, platformMaterial);
+
+    // Complex B: Sniper Nest (60, 60)
+    createBuilding(scene, 60, 60, 15, 15, 10, platformMaterial);
+    createStairs(scene, new THREE.Vector3(60, 0, 48), 25, 0.2, 5, platformMaterial);
+
+    // Complex C: Balcony Blocks (-80, 80)
+    createBuilding(scene, -80, 80, 30, 20, 6, platformMaterial);
+    createStairs(scene, new THREE.Vector3(-95, 0, 80), 15, 0.2, 6, platformMaterial);
+
+    // Complex D: Logistics Hub (70, -70)
+    createBuilding(scene, 70, -70, 20, 40, 8, accentMaterial);
+    createStairs(scene, new THREE.Vector3(70, 0, -90), 20, 0.2, 10, platformMaterial);
 
     // 5. Moving Targets (Removed)
     targets = []; // Ensure empty
 
-    // 6. Bots (Cylinders)
+    // 6. Bots (Multi-part for Headshots)
     for (let i = 0; i < CONFIG.BOT_COUNT; i++) {
-        const geometry = new THREE.CylinderGeometry(CONFIG.BOT_RADIUS, CONFIG.BOT_RADIUS, CONFIG.BOT_HEIGHT, 16);
-        const material = new THREE.MeshStandardMaterial({ color: 0xff4400 });
-        const bot = new THREE.Mesh(geometry, material);
+        const botGroup = new THREE.Group();
+        
+        // Body (Cylinder)
+        const bodyGeom = new THREE.CylinderGeometry(CONFIG.BOT_RADIUS, CONFIG.BOT_RADIUS, CONFIG.BOT_HEIGHT - 0.5, 16);
+        bodyGeom.translate(0, (CONFIG.BOT_HEIGHT - 0.5) / 2, 0);
+        const bodyMat = new THREE.MeshStandardMaterial({ color: 0xff4400 });
+        const body = new THREE.Mesh(bodyGeom, bodyMat);
+        body.userData.parentBot = botGroup;
+        botGroup.add(body);
 
-        const spawnPos = getRandomSafePosition(new THREE.Vector3(0, 0, 10)); 
-        bot.position.copy(spawnPos);
-        bot.position.y = CONFIG.BOT_HEIGHT / 2; // Sit on ground
+        // Head (Sphere)
+        const headGeom = new THREE.SphereGeometry(0.4, 16, 16);
+        headGeom.translate(0, CONFIG.BOT_HEIGHT - 0.2, 0);
+        const headMat = new THREE.MeshStandardMaterial({ color: 0xffff00 }); // Yellow Head
+        const head = new THREE.Mesh(headGeom, headMat);
+        head.userData.isHead = true;
+        head.userData.parentBot = botGroup;
+        botGroup.add(head);
 
-        bot.userData = {
+        const spawnPos = getRandomSafePosition(new THREE.Vector3(0, 0, 80)); 
+        botGroup.position.copy(spawnPos);
+        botGroup.position.y = 0; 
+
+        botGroup.userData = {
             isBot: true,
             originalColor: 0xff4400,
             baseScale: 1,
@@ -93,25 +157,99 @@ export function initWorld(scene) {
             strafeTimer: 0
         };
 
-        scene.add(bot);
-        bots.push(bot);
+        scene.add(botGroup);
+        bots.push(botGroup);
+    }
+
+    // 7. Pickups
+    initPickups(scene, game);
+
+    // 8. Cache AABBs for performance
+    obstacles.forEach(obs => {
+        obs.userData.aabb = new THREE.Box3().setFromObject(obs);
+    });
+}
+
+function initPickups(scene, game) {
+    const geom = new THREE.BoxGeometry(1, 1, 1);
+    const mat = new THREE.MeshStandardMaterial({ 
+        color: 0x00ff44, 
+        emissive: 0x00ff44, 
+        emissiveIntensity: 0.5 
+    });
+
+    for (let i = 0; i < CONFIG.PICKUP_SPAWN_COUNT; i++) {
+        const pickup = new THREE.Mesh(geom, mat);
+        pickup.position.set(
+            (Math.random() - 0.5) * 80,
+            1,
+            (Math.random() - 0.5) * 80
+        );
+        pickup.userData = {
+            type: 'health',
+            respawnTimer: 0
+        };
+        scene.add(pickup);
+        game.pickups.push(pickup);
+    }
+}
+
+function createBuilding(scene, x, z, w, d, h, material) {
+    const wallThick = 1;
+    // Walls
+    const wallConfigs = [
+        { size: [w, h, wallThick], pos: [x, h/2, z - d/2] }, // Back
+        { size: [w, h, wallThick], pos: [x, h/2, z + d/2], door: true }, // Front
+        { size: [wallThick, h, d], pos: [x - w/2, h/2, z] }, // Left
+        { size: [wallThick, h, d], pos: [x + w/2, h/2, z] }  // Right
+    ];
+
+    wallConfigs.forEach(cfg => {
+        const wall = new THREE.Mesh(new THREE.BoxGeometry(...cfg.size), material);
+        wall.position.set(...cfg.pos);
+        if (cfg.door) {
+            // Cut a door
+            wall.scale.x = 0.3; // Simple way to make a gap
+            wall.position.x += w * 0.35;
+        }
+        wall.castShadow = true;
+        wall.receiveShadow = true;
+        scene.add(wall);
+        obstacles.push(wall);
+    });
+
+    // Roof
+    const roof = new THREE.Mesh(new THREE.BoxGeometry(w, wallThick, d), material);
+    roof.position.set(x, h, z);
+    scene.add(roof);
+    obstacles.push(roof);
+}
+
+function createStairs(scene, startPos, numSteps, stepHeight, stepWidth, material) {
+    const stepDepth = 0.8;
+    for (let i = 0; i < numSteps; i++) {
+        const step = new THREE.Mesh(new THREE.BoxGeometry(stepWidth, 0.2, stepDepth), material);
+        step.position.set(
+            startPos.x, 
+            startPos.y + (i * stepHeight) + 0.1, 
+            startPos.z + (i * stepDepth)
+        );
+        step.castShadow = true;
+        step.receiveShadow = true;
+        scene.add(step);
+        obstacles.push(step);
     }
 }
 
 function getRandomSafePosition(playerPosition) {
-    const range = 40;
-    const minDistanceSq = CONFIG.MIN_SPAWN_DISTANCE * CONFIG.MIN_SPAWN_DISTANCE;
+    const range = 280; // 300m map
+    const minPlayerDistSq = CONFIG.MIN_SPAWN_DISTANCE * CONFIG.MIN_SPAWN_DISTANCE;
     let pos = new THREE.Vector3();
     let attempts = 0;
-
-    while (attempts < 10) {
-        pos.set(
-            (Math.random() - 0.5) * range,
-            Math.random() * 5 + 1,
-            (Math.random() - 0.5) * range
-        );
-
-        if (pos.distanceToSquared(playerPosition) > minDistanceSq) {
+    while (attempts < 50) {
+        pos.set((Math.random() - 0.5) * range, 1.5, (Math.random() - 0.5) * range);
+        if (pos.distanceToSquared(playerPosition) > minPlayerDistSq) {
+            pos.y = 0; // Snap to ground to avoid floating
             return pos;
         }
         attempts++;
@@ -174,8 +312,113 @@ export function updateWorld(game, dt) {
         }
     });
 
-    // 4. Update Tracers
+    // 4. Update Tracers & Grenades
     updateTracers(game.scene, dt);
+    updateGrenades(game, dt);
+}
+
+export function spawnGrenade(pos, vel, game) {
+    const geometry = new THREE.SphereGeometry(0.2, 8, 8);
+    const material = new THREE.MeshStandardMaterial({ color: 0x333333, emissive: 0x550000 });
+    const grenade = new THREE.Mesh(geometry, material);
+    
+    grenade.position.copy(pos);
+    grenade.userData = {
+        velocity: vel,
+        fuse: CONFIG.WEAPONS.GRENADE.fuse,
+        isGrenade: true
+    };
+    
+    game.scene.add(grenade);
+    game.worldGrenades.push(grenade);
+}
+
+function updateGrenades(game, dt) {
+    for (let i = game.worldGrenades.length - 1; i >= 0; i--) {
+        const g = game.worldGrenades[i];
+        
+        // Physics
+        g.userData.velocity.y += CONFIG.GRENADE_GRAVITY * dt;
+        g.position.addScaledVector(g.userData.velocity, dt);
+
+        // Ground Collision (Simple)
+        if (g.position.y < 0.2) {
+            g.position.y = 0.2;
+            g.userData.velocity.y *= -0.3; // Bounce
+            g.userData.velocity.x *= 0.5;
+            g.userData.velocity.z *= 0.5;
+        }
+
+        // Fuse
+        g.userData.fuse -= dt;
+        if (g.userData.fuse <= 0) {
+            explode(g.position, game);
+            game.scene.remove(g);
+            game.worldGrenades.splice(i, 1);
+        }
+    }
+}
+
+function explode(pos, game) {
+    // 1. Visual Effect
+    const geometry = new THREE.SphereGeometry(CONFIG.WEAPONS.GRENADE.radius, 16, 16);
+    const material = new THREE.MeshBasicMaterial({ 
+        color: 0xff4400, 
+        transparent: true, 
+        opacity: 0.6 
+    });
+    const explosion = new THREE.Mesh(geometry, material);
+    explosion.position.copy(pos);
+    game.scene.add(explosion);
+
+    // Flash light
+    const light = new THREE.PointLight(0xff4400, 10, 20);
+    light.position.copy(pos);
+    game.scene.add(light);
+
+    // Screen Shake
+    const distToPlayer = pos.distanceTo(game.playerState.position);
+    if (distToPlayer < 20) {
+        const intensity = (1.0 - distToPlayer / 20) * 2;
+        game.playerState.cameraShake.x += (Math.random() - 0.5) * intensity;
+        game.playerState.cameraShake.y += (Math.random() - 0.5) * intensity;
+    }
+
+    // 2. Damage Logic
+    bots.forEach(bot => {
+        if (bot.userData.isDead) return;
+        const dist = bot.position.distanceTo(pos);
+        if (dist < CONFIG.WEAPONS.GRENADE.radius) {
+            bot.userData.health -= CONFIG.WEAPONS.GRENADE.damage;
+            flashBot(bot, true);
+            bot.userData.hitTimer = 0.2;
+            
+            if (bot.userData.health <= 0) {
+                bot.userData.isDead = true;
+                bot.userData.respawnTimer = CONFIG.RESPAWN_DELAY;
+                game.playerState.score += 1;
+                game.addEvent("GRENADE KILL!", "#ff4400");
+                
+                // Fall Over animation
+                bot.rotation.x = -Math.PI / 2;
+                bot.position.y = 0.5;
+            }
+        }
+    });
+
+    // Fade out effect
+    let t = 0;
+    const interval = setInterval(() => {
+        t += 0.05;
+        explosion.scale.setScalar(2 + t * 4); // Bigger blast
+        explosion.material.opacity = 0.9 * (1 - t);
+        light.intensity = 20 * (1 - t);
+        if (t >= 1) {
+            game.scene.remove(explosion);
+            game.scene.remove(light);
+            clearInterval(interval);
+        }
+    }, 16);
 }
 
 const _dirToPlayer = new THREE.Vector3();
@@ -188,16 +431,16 @@ export function updateBots(game, dt, playerHitbox) {
     bots.forEach(bot => {
         // 1. Death & Respawn Logic
         if (bot.userData.isDead) {
-            bot.scale.lerp(_zeroVec, CONFIG.DEATH_ANIMATION_SPEED * dt);
             bot.userData.respawnTimer -= dt;
             if (bot.userData.respawnTimer <= 0) {
                 const newPos = getRandomSafePosition(_playerPos);
                 bot.position.copy(newPos);
-                bot.position.y = CONFIG.BOT_HEIGHT / 2;
+                bot.position.y = 0; 
+                bot.rotation.x = 0; // Stand Up
                 bot.userData.isDead = false;
                 bot.userData.health = CONFIG.BOT_HEALTH;
                 bot.userData.respawnTimer = 0;
-                bot.material.color.set(bot.userData.originalColor);
+                flashBot(bot, false); // Reset color
                 bot.scale.setScalar(bot.userData.baseScale);
                 bot.userData.state = 'idle';
                 bot.userData.reactionTimer = 0;
@@ -214,7 +457,7 @@ export function updateBots(game, dt, playerHitbox) {
         if (bot.userData.hitTimer > 0) {
             bot.userData.hitTimer -= dt;
             if (bot.userData.hitTimer <= 0) {
-                bot.material.color.set(bot.userData.originalColor);
+                flashBot(bot, false);
             }
         }
         if (bot.scale.x > bot.userData.baseScale) {
@@ -257,6 +500,33 @@ export function updateBots(game, dt, playerHitbox) {
                     bot.position.addScaledVector(_strafeVec, bot.userData.strafeDir * CONFIG.BOT_STRAFE_SPEED * dt);
                 }
             }
+
+            // BOT COLLISION CHECK
+            obstacles.forEach(obs => {
+                const box = obs.userData.aabb;
+                if (!box) return;
+                
+                // Simple radius-based check for bots
+                const botMinX = bot.position.x - 0.5;
+                const botMaxX = bot.position.x + 0.5;
+                const botMinZ = bot.position.z - 0.5;
+                const botMaxZ = bot.position.z + 0.5;
+
+                if (botMaxX > box.min.x && botMinX < box.max.x &&
+                    botMaxZ > box.min.z && botMinZ < box.max.z) {
+                    // Overlap detected. Push out.
+                    const overlapX = Math.min(botMaxX, box.max.x) - Math.max(botMinX, box.min.x);
+                    const overlapZ = Math.min(botMaxZ, box.max.z) - Math.max(botMinZ, box.min.z);
+
+                    if (overlapX < overlapZ) {
+                        const dir = bot.position.x > (box.min.x + box.max.x) / 2 ? 1 : -1;
+                        bot.position.x += (overlapX + 0.1) * dir;
+                    } else {
+                        const dir = bot.position.z > (box.min.z + box.max.z) / 2 ? 1 : -1;
+                        bot.position.z += (overlapZ + 0.1) * dir;
+                    }
+                }
+            });
 
             // C. Shooting with LoS Check & Reaction Delay
             if (bot.userData.reactionTimer > 0) {
@@ -385,4 +655,16 @@ export function updateTracers(scene, dt) {
             tracer.material.opacity = (tracer.userData.life / CONFIG.TRACER_DURATION) * 0.8;
         }
     }
+}
+function flashBot(bot, isWhite) {
+    bot.traverse(child => {
+        if (child.isMesh) {
+            if (isWhite) {
+                if (child.userData.oldColor === undefined) child.userData.oldColor = child.material.color.getHex();
+                child.material.color.set(0xffffff);
+            } else if (child.userData.oldColor !== undefined) {
+                child.material.color.set(child.userData.oldColor);
+            }
+        }
+    });
 }

@@ -34,6 +34,11 @@ export function initInput(game) {
             case 'ShiftLeft': game.inputBuffer.modifier = true; break;
             case 'KeyO': game.inputBuffer.shoot = true; break;
             case 'KeyQ': game.inputBuffer.ads = true; break;
+            case 'Digit1': game.inputBuffer.switchIndex = 0; break;
+            case 'Digit2': game.inputBuffer.switchIndex = 1; break;
+            case 'Digit3': game.inputBuffer.switchIndex = 2; break;
+            case 'KeyG': game.inputBuffer.grenade = true; break;
+            case 'KeyR': game.inputBuffer.reload = true; break;
             case 'KeyP': 
                 const debug = document.getElementById('debug-info');
                 debug.classList.toggle('hidden');
@@ -51,6 +56,8 @@ export function initInput(game) {
             case 'ShiftLeft': game.inputBuffer.modifier = false; break;
             case 'KeyO': game.inputBuffer.shoot = false; break;
             case 'KeyQ': game.inputBuffer.ads = false; break;
+            case 'KeyR': game.inputBuffer.reload = false; break;
+            case 'KeyG': game.inputBuffer.grenade = false; break;
         }
     });
 
@@ -121,6 +128,12 @@ export function initInput(game) {
         if (e.button === 2) game.inputBuffer.ads = false;
     });
 
+    window.addEventListener('wheel', (e) => {
+        if (!game.isStarted) return;
+        if (e.deltaY > 0) game.inputBuffer.switchNext = true;
+        else if (e.deltaY < 0) game.inputBuffer.switchPrev = true;
+    });
+
     container.addEventListener('contextmenu', (e) => e.preventDefault());
     window.addEventListener('mouseenter', () => { firstMove = true; });
 }
@@ -134,4 +147,14 @@ export function updateInput(game, dt) {
 
     game.playerState.isShooting = game.inputBuffer.shoot;
     game.playerState.isADS = game.inputBuffer.ads;
+    game.playerState.isReloadingRequested = game.inputBuffer.reload;
+    game.playerState.isAimingGrenade = game.inputBuffer.grenade;
+
+    if (game.inputBuffer.switchIndex !== undefined) {
+        if (game.inputBuffer.switchIndex < game.playerState.inventory.length) {
+            game.playerState.currentWeaponIndex = game.inputBuffer.switchIndex;
+            game.playerState.isReloading = false;
+        }
+        game.inputBuffer.switchIndex = undefined;
+    }
 }

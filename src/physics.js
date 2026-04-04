@@ -72,7 +72,7 @@ export function updatePhysics(game, dt) {
         game.playerState.currentFOV = THREE.MathUtils.lerp(game.playerState.currentFOV, CONFIG.FOV_BASE + CONFIG.SLIDE_FOV_MOD, 5 * dt);
 
         // Terminate slide if too slow or time up
-        if (playerState.slideTimer <= 0 || horizSpeed < 20) {
+        if (playerState.slideTimer <= 0 || horizSpeed < 5) {
             playerState.isSliding = false;
             playerState.slideCooldown = CONFIG.SLIDE_COOLDOWN;
         }
@@ -130,36 +130,58 @@ export function updatePhysics(game, dt) {
         playerState.velocity.z = 0;
     }
 
+    // 7. Ground / Height Handling
+    const targetHeight = playerState.isCrouching ? CONFIG.CROUCH_HEIGHT : CONFIG.PLAYER_HEIGHT;
+
     // B. Obstacle Collisions (AABB)
     const playerHalfWidth = CONFIG.PLAYER_WIDTH / 2;
-    const playerMinX = playerState.position.x - playerHalfWidth;
-    const playerMaxX = playerState.position.x + playerHalfWidth;
-    const playerMinZ = playerState.position.z - playerHalfWidth;
-    const playerMaxZ = playerState.position.z + playerHalfWidth;
-
     obstacles.forEach(obstacle => {
-        const box = new THREE.Box3().setFromObject(obstacle);
+        const box = obstacle.userData.aabb || new THREE.Box3().setFromObject(obstacle);
         
-        // Check for overlap on X and Z
-        const overlapX = Math.min(playerMaxX, box.max.x) - Math.max(playerMinX, box.min.x);
-        const overlapZ = Math.min(playerMaxZ, box.max.z) - Math.max(playerMinZ, box.min.z);
+        // Recalculate local bounds for every check (since player might move during loop)
+        const curMinX = playerState.position.x - playerHalfWidth;
+        const curMaxX = playerState.position.x + playerHalfWidth;
+        const curMinZ = playerState.position.z - playerHalfWidth;
+        const curMaxZ = playerState.position.z + playerHalfWidth;
+        const curFeetY = playerState.position.y - targetHeight;
 
-        if (overlapX > 0 && overlapZ > 0) {
-            // Resolve along the shallowest axis
-            if (overlapX < overlapZ) {
-                const dir = playerState.position.x > (box.min.x + box.max.x) / 2 ? 1 : -1;
-                playerState.position.x += overlapX * dir;
-                playerState.velocity.x = 0;
-            } else {
-                const dir = playerState.position.z > (box.min.z + box.max.z) / 2 ? 1 : -1;
-                playerState.position.z += overlapZ * dir;
-                playerState.velocity.z = 0;
+        // 1. Horizontal Check
+        if (curMaxX > box.min.x && curMinX < box.max.x &&
+            curMaxZ > box.min.z && curMinZ < box.max.z) {
+            
+            const playerHeadY = playerState.position.y + 0.2; // approx head top
+            const heightDiff = box.max.y - curFeetY;
+            const ceilingDiff = playerHeadY - box.min.y;
+
+            // STEP UP: Small ledge
+            if (heightDiff > 0 && heightDiff <= CONFIG.STEP_HEIGHT) {
+                playerState.position.y = box.max.y + targetHeight + 0.01; 
+                playerState.velocity.y = 0;
+                playerState.isGrounded = true;
+            } 
+            // CEILING COLLISION: Hit head from below
+            else if (ceilingDiff > 0 && playerState.position.y < box.max.y && playerState.position.y > box.min.y) {
+                playerState.position.y = box.min.y - 0.21;
+                playerState.velocity.y = 0;
+            }
+            // HARD WALL: Resolve horizontally
+            else if (heightDiff > CONFIG.STEP_HEIGHT) {
+                const overlapX = Math.min(curMaxX, box.max.x) - Math.max(curMinX, box.min.x);
+                const overlapZ = Math.min(curMaxZ, box.max.z) - Math.max(curMinZ, box.min.z);
+
+                if (overlapX < overlapZ) {
+                    const dir = playerState.position.x > (box.min.x + box.max.x) / 2 ? 1 : -1;
+                    playerState.position.x += (overlapX + 0.05) * dir;
+                    playerState.velocity.x = 0;
+                } else {
+                    const dir = playerState.position.z > (box.min.z + box.max.z) / 2 ? 1 : -1;
+                    playerState.position.z += (overlapZ + 0.05) * dir;
+                    playerState.velocity.z = 0;
+                }
             }
         }
     });
 
-    // 7. Ground / Height Handling
-    const targetHeight = playerState.isCrouching ? CONFIG.CROUCH_HEIGHT : CONFIG.PLAYER_HEIGHT;
     if (playerState.isGrounded) {
         playerState.position.y = THREE.MathUtils.lerp(playerState.position.y, targetHeight, 10 * dt);
     }

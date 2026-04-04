@@ -8,7 +8,9 @@
 </head>
 <body>
     <div id="game-container">
-        <div id="instruction">PAUSED<br><span>CLICK TO RESUME</span></div>
+        <!-- DAMAGE FLASH -->
+        <div id="damage-flash"></div>
+
         <!-- Crosshair -->
         <div id="crosshair">
             <div class="dot"></div>
@@ -25,19 +27,55 @@
             </div>
         </div>
 
-        <!-- HUD -->
-        <div id="hud">
-            <div id="fps-counter">FPS: 0</div>
-            <div id="player-hp">HP: 100</div>
-            <div id="score-display">SCORE: 0</div>
-            <div id="speed-meter">SPD: 0</div>
-            <div id="slide-status">SLD: READY</div>
-            <div id="control-mode">MODE: POINTER LOCK</div>
-            <div id="mode-hint">PRESS [T] TO SWITCH MODE</div>
-            <div id="debug-info" class="hidden">
-                <p>POS: <span id="pos-display">0, 0, 0</span></p>
-                <p>VEL: <span id="vel-display">0, 0, 0</span></p>
+        <!-- NEW ADVANCED HUD -->
+        <div id="hud-v2">
+            <!-- Top Right: Stats & Feed -->
+            <div class="hud-group top-right">
+                <div id="kill-counter">KILLS: 0</div>
+                <div id="fps-counter">FPS: 0</div>
+                <div id="speed-meter">SPD: 0</div>
+                <div id="event-feed"></div>
             </div>
+
+            <!-- Center: Action Alerts -->
+            <div id="action-banner" class="hidden">RELOADING...</div>
+
+            <!-- Bottom Left: Health -->
+            <div class="hud-group bottom-left">
+                <!-- Minimap -->
+                <div id="minimap-container">
+                    <div id="minimap-player"></div>
+                </div>
+                
+                <div class="stat-label">HEALTH</div>
+                <div class="bar-container health">
+                    <div id="health-bar-fill" class="bar-fill"></div>
+                </div>
+                <div id="player-hp-val">100</div>
+            </div>
+
+            <!-- Bottom Right: Ammo & Weapon -->
+            <div class="hud-group bottom-right">
+                <div id="weapon-name">PISTOL</div>
+                <div class="ammo-info">
+                    <span id="ammo-mag">12</span> / <span id="ammo-reserve">∞</span>
+                </div>
+                <div class="bar-container ammo">
+                    <div id="ammo-bar-fill" class="bar-fill"></div>
+                </div>
+            </div>
+
+            <!-- Bottom Center: Inventory -->
+            <div id="inventory-bar">
+                <div class="inv-slot" id="slot-0">1</div>
+                <div class="inv-slot" id="slot-1">2</div>
+                <div class="inv-slot" id="slot-2">3</div>
+            </div>
+        </div>
+
+        <div id="debug-info" class="hidden">
+            <p>POS: <span id="pos-display">0, 0, 0</span></p>
+            <p>VEL: <span id="vel-display">0, 0, 0</span></p>
         </div>
         <div id="instruction">PAUSED<br><span>CLICK TO RESUME</span></div>
         <div id="death-screen">YOU DIED<br><span>RESPAWNING...</span></div>
