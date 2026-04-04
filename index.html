@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ShootMaster | 3D FPS Prototype</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="game-container">
+        <!-- Crosshair -->
+        <div id="crosshair">
+            <div class="dot"></div>
+            <div class="line top"></div>
+            <div class="line bottom"></div>
+            <div class="line left"></div>
+            <div class="line right"></div>
+            <!-- Hit Marker -->
+            <div id="hit-marker" class="hidden">
+                <div class="m1"></div>
+                <div class="m2"></div>
+                <div class="m3"></div>
+                <div class="m4"></div>
+            </div>
+        </div>
+
+        <!-- HUD -->
+        <div id="hud">
+            <div id="fps-counter">FPS: 0</div>
+            <div id="speed-meter">SPD: 0</div>
+            <div id="slide-status">SLD: READY</div>
+            <div id="control-mode">MODE: POINTER LOCK</div>
+            <div id="mode-hint">PRESS [T] TO SWITCH MODE</div>
+            <div id="debug-info" class="hidden">
+                <p>POS: <span id="pos-display">0, 0, 0</span></p>
+                <p>VEL: <span id="vel-display">0, 0, 0</span></p>
+            </div>
+            <div id="instruction">Click to Start</div>
+        </div>
+    </div>
+    <script type="module" src="/src/main.js"></script>
+</body>
+</html>

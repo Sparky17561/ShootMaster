@@ -1,0 +1,156 @@
+body {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: #000;
+}
+
+#game-container {
+    width: 100vw;
+    height: 100vh;
+    position: relative;
+}
+
+/* Crosshair Style */
+#crosshair {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 20px;
+    height: 20px;
+    pointer-events: none;
+    z-index: 10;
+}
+
+#crosshair .dot {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 2px;
+    height: 2px;
+    background: #00ff00;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+}
+
+#crosshair .line {
+    position: absolute;
+    background: #00ff00;
+}
+
+#crosshair .top, #crosshair .bottom {
+    width: 1px;
+    height: 6px;
+    left: 50%;
+    transform: translateX(-50%);
+}
+
+#crosshair .left, #crosshair .right {
+    width: 6px;
+    height: 1px;
+    top: 50%;
+    transform: translateY(-50%);
+}
+
+#crosshair .top { top: 0; }
+#crosshair .bottom { bottom: 0; }
+#crosshair .left { left: 0; }
+#crosshair .right { right: 0; }
+
+/* Hit Marker Style */
+#hit-marker {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 24px;
+    height: 24px;
+    transform: translate(-50%, -50%) rotate(45deg);
+    pointer-events: none;
+    transition: opacity 0.1s ease-out;
+}
+
+#hit-marker.hidden {
+    opacity: 0;
+    display: block !important; /* Keep in DOM for transition */
+    pointer-events: none;
+}
+
+#hit-marker div {
+    position: absolute;
+    background: #ff3333;
+}
+
+#hit-marker .m1, #hit-marker .m3 {
+    width: 2px;
+    height: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+}
+
+#hit-marker .m2, #hit-marker .m4 {
+    width: 8px;
+    height: 2px;
+    top: 50%;
+    transform: translateY(-50%);
+}
+
+#hit-marker .m1 { top: -2px; }
+#hit-marker .m3 { bottom: -2px; }
+#hit-marker .m2 { right: -2px; }
+#hit-marker .m4 { left: -2px; }
+
+@keyframes hit-fade {
+    0% { opacity: 1; transform: translate(-50%, -50%) rotate(45deg) scale(1.2); }
+    100% { opacity: 0; transform: translate(-50%, -50%) rotate(45deg) scale(1.0); }
+}
+
+.hit-animate {
+    animation: hit-fade 0.15s ease-out forwards;
+}
+
+/* HUD Style */
+#hud {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    color: #00ff00;
+    pointer-events: none;
+    z-index: 20;
+    text-shadow: 1px 1px 2px #000;
+    font-family: 'Courier New', Courier, monospace;
+}
+
+#fps-counter, #speed-meter, #slide-status, #control-mode {
+    font-size: 14px;
+    font-weight: bold;
+    margin-bottom: 4px;
+}
+
+#mode-hint {
+    font-size: 11px;
+    color: rgba(0, 255, 0, 0.6);
+    margin-bottom: 10px;
+}
+
+#debug-info {
+    margin-top: 10px;
+    font-size: 12px;
+}
+
+#debug-info.hidden {
+    display: none;
+}
+
+#instruction {
+    position: absolute;
+    top: 50vh;
+    left: 50vw;
+    transform: translate(-50%, -50%);
+    font-size: 24px;
+    background: rgba(0, 0, 0, 0.5);
+    padding: 10px 20px;
+    border-radius: 5px;
+    pointer-events: none;
+}
