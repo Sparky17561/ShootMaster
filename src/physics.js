@@ -152,11 +152,11 @@ export function updatePhysics(game, dt) {
             const distFromTop = playerFeetY - box.max.y;
 
             // 1. FEET: Ground / Ledge / Step Up
-            if (distFromTop > -0.5 && distFromTop < 0.1) {
+            if (distFromTop > -1.5 && distFromTop < 0.2) {
                 playerState.position.y = box.max.y + targetHeight;
                 playerState.velocity.y = 0;
                 isStandingOnSomething = true;
-            } 
+            }
             // 2. HEAD: Ceiling
             else if (playerHeadY > box.min.y && playerState.position.y < box.max.y) {
                 playerState.position.y = box.min.y - 0.2;

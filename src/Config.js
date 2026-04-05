@@ -23,7 +23,7 @@ export const CONFIG = {
 
     MISSION_TIME: 300, // 5 Minutes
     // Step-Up (Stair Climbability)
-    STEP_HEIGHT: 0.5,
+    STEP_HEIGHT: 0.55,
 
     // Mouse
     MOUSE_SENSITIVITY: 0.002,
@@ -108,13 +108,13 @@ export const CONFIG = {
     ADS_LERP_SPEED: 10,
     
     // Hit Marker
-    HIT_COOLDOWN: 0.1, 
+    HIT_COOLDOWN: 0.25, 
 
     // Bots
     BOT_COUNT: 15,
     BOT_TYPES: {
         GRUNT: { damage: 15, accuracy: 0.1, fireRate: 2.5, probability: 1.0 },
-        SNIPER: { damage: 50, accuracy: 0.01, fireRate: 4.0, probability: 0.0 }
+        SNIPER: { damage: 50, accuracy: 0.01, fireRate: 4.0, probability: 0.15 }
     },
     BOT_EVASION_FACTOR: 0.005,
     BOT_HEALTH: 100,

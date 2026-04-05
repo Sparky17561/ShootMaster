@@ -3,93 +3,296 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ShootMaster | 3D FPS Prototype</title>
+    <title>ShootMaster | FPS Arena</title>
+    <meta name="description" content="Browser-based 3D FPS game with singleplayer, bots, and online PvP multiplayer.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
+    <!-- Socket.IO client -->
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 </head>
 <body>
-    <div id="game-container">
-        <!-- DAMAGE FLASH -->
-        <div id="damage-flash"></div>
 
-        <!-- Crosshair -->
-        <div id="crosshair">
-            <div class="dot"></div>
-            <div class="line top"></div>
-            <div class="line bottom"></div>
-            <div class="line left"></div>
-            <div class="line right"></div>
-            <!-- Hit Marker -->
-            <div id="hit-marker" class="hidden">
-                <div class="m1"></div>
-                <div class="m2"></div>
-                <div class="m3"></div>
-                <div class="m4"></div>
+<!-- ══ SCREENS LAYER — always on top ══ -->
+<div id="screens-layer">
+
+    <!-- MAIN MENU -->
+    <div id="main-menu" class="screen">
+        <div class="screen-bg">
+            <div class="bg-grid"></div>
+            <div class="bg-glow left"></div>
+            <div class="bg-glow right"></div>
+        </div>
+        <div class="menu-content">
+            <div class="logo-wrap">
+                <div class="logo-sup">TACTICAL ARENA</div>
+                <h1 class="logo-title">SHOOT<span>MASTER</span></h1>
+                <p class="logo-sub">ELIMINATE · SURVIVE · DOMINATE</p>
+            </div>
+
+            <div class="mode-grid">
+                <button class="mode-card active" data-mode="solo">
+                    <span class="card-icon">◉</span>
+                    <span class="card-name">SINGLE PLAYER</span>
+                    <span class="card-desc">Solo vs AI bots</span>
+                </button>
+
+                <button class="mode-card" data-mode="pvp">
+                    <span class="card-icon">⬡</span>
+                    <span class="card-name">PvP ONLINE</span>
+                    <span class="card-desc">Fight real players</span>
+                </button>
+            </div>
+
+            <button id="menu-play-btn" class="play-btn">
+                <span>ENTER ARENA</span>
+                <svg width="20" height="20" viewBox="0 0 20 20"><polygon points="6,3 17,10 6,17" fill="currentColor"/></svg>
+            </button>
+
+            <div class="key-hints">
+                <span>WASD Move</span><span>L-Click Shoot</span><span>R-Click ADS</span>
+                <span>Shift Slide</span><span>R Reload</span><span>1-4 Weapons</span>
             </div>
         </div>
-
-        <!-- NEW ADVANCED HUD -->
-        <div id="hud-v2">
-            <!-- Top Center: Mission Timer -->
-            <div id="mission-timer">05:00</div>
-
-            <!-- Top Right: Stats & Feed -->
-            <div class="hud-group top-right">
-                <div id="kill-counter">KILLS: 0</div>
-                <div id="fps-counter">FPS: 0</div>
-                <div id="speed-meter">SPD: 0</div>
-                <div id="event-feed"></div>
-            </div>
-
-            <!-- Center: Action Alerts -->
-            <div id="action-banner" class="hidden">RELOADING...</div>
-
-            <!-- Center: Sniper Scope -->
-            <div id="sniper-scope" class="hidden">
-                <div class="scope-crosshair"></div>
-                <div class="scope-lens"></div>
-            </div>
-
-            <!-- Bottom Left: Health -->
-            <div class="hud-group bottom-left">
-                <!-- Minimap -->
-                <div id="minimap-container">
-                    <div id="minimap-player"></div>
-                </div>
-                
-                <div class="stat-label">HEALTH</div>
-                <div class="bar-container health">
-                    <div id="health-bar-fill" class="bar-fill"></div>
-                </div>
-                <div id="player-hp-val">100</div>
-            </div>
-
-            <!-- Bottom Right: Ammo & Weapon -->
-            <div class="hud-group bottom-right">
-                <div id="weapon-name">PISTOL</div>
-                <div class="ammo-info">
-                    <span id="ammo-mag">12</span> / <span id="ammo-reserve">∞</span>
-                </div>
-                <div class="bar-container ammo">
-                    <div id="ammo-bar-fill" class="bar-fill"></div>
-                </div>
-            </div>
-
-            <!-- Bottom Center: Inventory -->
-            <div id="inventory-bar">
-                <div class="inv-slot" id="slot-0">1</div>
-                <div class="inv-slot" id="slot-1">2</div>
-                <div class="inv-slot" id="slot-2">3</div>
-                <div class="inv-slot" id="slot-3">4</div>
-            </div>
-        </div>
-
-        <div id="debug-info" class="hidden">
-            <p>POS: <span id="pos-display">0, 0, 0</span></p>
-            <p>VEL: <span id="vel-display">0, 0, 0</span></p>
-        </div>
-        <div id="instruction">PAUSED<br><span>CLICK TO RESUME</span></div>
-        <div id="death-screen">YOU DIED<br><span>RESPAWNING...</span></div>
     </div>
-    <script type="module" src="/src/main.js"></script>
+
+    <!-- SETUP SCREEN -->
+    <div id="setup-screen" class="screen hidden">
+        <div class="screen-bg">
+            <div class="bg-grid"></div>
+            <div class="bg-glow center"></div>
+        </div>
+        <div class="setup-wrap">
+            <div class="setup-top">
+                <button id="setup-back-btn" class="back-btn">← BACK</button>
+                <div class="setup-breadcrumb">
+                    <span>ARENA</span>
+                    <span class="bc-sep">›</span>
+                    <span id="setup-mode-label" class="bc-active">SINGLE PLAYER</span>
+                </div>
+            </div>
+
+            <div class="setup-card">
+                <h2 class="setup-heading">OPERATOR SETUP</h2>
+
+                <div class="setup-row">
+                    <label class="setup-label">CALL SIGN</label>
+                    <input id="player-name-input" class="setup-input" type="text"
+                           placeholder="Enter codename..." maxlength="20" autocomplete="off">
+                </div>
+
+                <div class="setup-row">
+                    <label class="setup-label">TEAM COLOR</label>
+                    <div id="color-swatches" class="swatches"></div>
+                </div>
+
+                <div id="room-id-section" class="setup-row" style="display:none">
+                    <div class="room-mode-toggle" style="display:flex; gap:8px; margin-bottom:4px;">
+                        <button id="btn-create-room" class="room-toggle active">CREATE</button>
+                        <button id="btn-join-room" class="room-toggle">JOIN</button>
+                    </div>
+                    <div id="join-room-input-container" style="display:none;">
+                        <label class="setup-label">ROOM CODE</label>
+                        <input id="room-id-input" class="setup-input" type="text"
+                               placeholder="Enter existing code..." maxlength="10"
+                               autocomplete="off" style="text-transform:uppercase">
+                    </div>
+                </div>
+
+                <button id="setup-confirm-btn" class="play-btn deploy-btn">
+                    <span>DEPLOY</span>
+                    <svg width="18" height="18" viewBox="0 0 20 20"><polygon points="6,3 17,10 6,17" fill="currentColor"/></svg>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- LOBBY SCREEN -->
+    <div id="lobby-screen" class="screen hidden">
+        <div class="screen-bg">
+            <div class="bg-grid"></div>
+            <div class="bg-glow center"></div>
+        </div>
+        <div class="setup-wrap" style="max-width: 600px;">
+            <div class="setup-top" style="justify-content: space-between;">
+                <button id="lobby-leave-btn" class="back-btn">LEAVE ROOM</button>
+                <div class="setup-breadcrumb">
+                    <span>ROOM CODE:</span>
+                    <span id="lobby-room-code" class="bc-active">---</span>
+                </div>
+            </div>
+
+            <div class="setup-card" style="padding: 24px;">
+                <h2 class="setup-heading" style="text-align: center;">WAITING FOR OPERATORS...</h2>
+                
+                <div class="lobby-grid">
+                    <div class="lobby-players">
+                        <div class="lobby-col-title">SQUAD</div>
+                        <div id="lobby-player-list">
+                            <!-- Players injected here -->
+                        </div>
+                    </div>
+                </div>
+
+                <button id="lobby-start-btn" class="play-btn deploy-btn" style="margin-top:20px; display:none;">START MISSION <span>&#9654;</span></button>
+                <button id="lobby-terminate-btn" class="back-btn" style="width: 100%; border: 1px solid rgba(255,50,80,0.5); color: #ff3355; margin-top: 10px; display:none; text-align: center; justify-content: center; padding: 12px; font-weight: 700; border-radius: 6px; letter-spacing: 0.1em;">TERMINATE ROOM</button>
+                <div id="lobby-waiting-msg" style="text-align: center; color: var(--muted); font-size: 11px; letter-spacing: 0.1em; margin-top: 8px;">Waiting for host to start...</div>
+            </div>
+        </div>
+    </div>
+
+</div>
+<!-- end screens-layer -->
+
+
+<!-- ══ GAME LAYER — only visible during play ══ -->
+<div id="game-container" class="game-hidden">
+
+    <!-- Damage Flash -->
+    <div id="damage-flash"></div>
+
+    <!-- Crosshair -->
+    <div id="crosshair">
+        <div class="dot"></div>
+        <div class="line top"></div>
+        <div class="line bottom"></div>
+        <div class="line left"></div>
+        <div class="line right"></div>
+        <div id="hit-marker" class="hidden">
+            <div class="m1"></div><div class="m2"></div>
+            <div class="m3"></div><div class="m4"></div>
+        </div>
+    </div>
+
+    <!-- HUD -->
+    <div id="hud-v2">
+
+        <div class="hud-group top-left">
+            <div id="mode-badge">SOLO</div>
+            <div id="player-name-hud"></div>
+        </div>
+
+        <div id="mission-timer">05:00</div>
+
+        <div class="hud-group top-right">
+            <div id="kill-counter">KILLS: 0</div>
+            <div id="fps-counter">FPS: 0</div>
+            <div id="speed-meter">SPD: 0</div>
+            <div id="event-feed"></div>
+        </div>
+
+        <div id="action-banner" class="hidden">RELOADING...</div>
+
+        <div id="sniper-scope" class="hidden">
+            <!-- Scope tunnel: black around a circular window — drawn entirely in CSS -->
+            <!-- Reticle sits centered in viewport -->
+            <div class="scope-reticle">
+                <!-- Main cross lines -->
+                <div class="sc-line sc-h"></div>
+                <div class="sc-line sc-v"></div>
+                <!-- Center dot -->
+                <div class="sc-center-dot"></div>
+                <!-- Mil-dots on horizontal axis -->
+                <div class="sc-mil md-l3"></div>
+                <div class="sc-mil md-l2"></div>
+                <div class="sc-mil md-l1"></div>
+                <div class="sc-mil md-r1"></div>
+                <div class="sc-mil md-r2"></div>
+                <div class="sc-mil md-r3"></div>
+                <!-- Range graduation marks (vertical axis) -->
+                <div class="sc-tick tk-u1"></div>
+                <div class="sc-tick tk-u2"></div>
+                <div class="sc-tick tk-d1"></div>
+                <div class="sc-tick tk-d2"></div>
+                <!-- Corner brackets -->
+                <div class="sc-bracket br-tl"></div>
+                <div class="sc-bracket br-tr"></div>
+                <div class="sc-bracket br-bl"></div>
+                <div class="sc-bracket br-br"></div>
+            </div>
+        </div>
+
+        <div class="hud-group bottom-left">
+            <div id="minimap-container">
+                <div id="minimap-player"></div>
+                <div class="minimap-label">N</div>
+            </div>
+            <div class="stat-label">HEALTH</div>
+            <div class="bar-container">
+                <div id="health-bar-fill" class="bar-fill health-high"></div>
+            </div>
+            <div id="player-hp-val">100</div>
+        </div>
+
+        <div class="hud-group bottom-right">
+            <div id="weapon-name">PISTOL</div>
+            <div class="ammo-info">
+                <span id="ammo-mag">12</span>
+                <span class="ammo-sep">/</span>
+                <span id="ammo-reserve">∞</span>
+            </div>
+            <div class="bar-container">
+                <div id="ammo-bar-fill" class="bar-fill ammo-active"></div>
+            </div>
+        </div>
+
+        <div id="inventory-bar">
+            <div class="inv-slot" id="slot-0"><span class="slot-key">1</span><span class="slot-name">PISTOL</span></div>
+            <div class="inv-slot" id="slot-1"><span class="slot-key">2</span><span class="slot-name">RIFLE</span></div>
+            <div class="inv-slot" id="slot-2"><span class="slot-key">3</span><span class="slot-name">SHOTGUN</span></div>
+            <div class="inv-slot" id="slot-3"><span class="slot-key">4</span><span class="slot-name">SNIPER</span></div>
+        </div>
+
+        <div id="leaderboard-panel" class="hidden">
+            <div class="lb-hdr">LEADERBOARD</div>
+            <div id="leaderboard-list"></div>
+        </div>
+    </div>
+
+    <!-- Chat (PvP only) -->
+    <div id="chat-panel" style="display:none">
+        <div id="chat-messages"></div>
+        <form id="chat-form">
+            <input type="text" id="chat-input" placeholder="Press Enter to chat..." maxlength="150" autocomplete="off">
+        </form>
+    </div>
+
+    <!-- Debug -->
+    <div id="debug-info" class="hidden">
+        <p>POS: <span id="pos-display">0,0,0</span></p>
+        <p>VEL: <span id="vel-display">0,0,0</span></p>
+    </div>
+
+    <div id="instruction" class="hidden">
+        <div class="pause-menu-card">
+            <h1 class="pause-title">MISSION PAUSED</h1>
+            <div class="pause-stats">
+                <div class="pause-stat-box">
+                    <span class="ps-label">KILLS</span>
+                    <span class="ps-val" id="pause-val-kills" style="color: var(--green);">0</span>
+                </div>
+                <div class="pause-stat-box">
+                    <span class="ps-label">DEATHS</span>
+                    <span class="ps-val" id="pause-val-deaths" style="color: var(--red);">0</span>
+                </div>
+                <div class="pause-stat-box">
+                    <span class="ps-label">K/D RATIO</span>
+                    <span class="ps-val" id="pause-val-kd" style="color: var(--gold);">0.00</span>
+                </div>
+            </div>
+            <div class="pause-actions">
+                <button id="pause-resume-btn" class="play-btn deploy-btn">
+                    <span>RESUME MISSION</span>
+                    <svg width="18" height="18" viewBox="0 0 20 20"><polygon points="6,3 17,10 6,17" fill="currentColor"/></svg>
+                </button>
+                <button id="pause-abort-btn" class="back-btn" style="width: 100%; border: 1px solid rgba(255,50,80,0.5); color: #ff3355; margin-top: 10px; text-align: center; justify-content: center;">ABORT TO MENU</button>
+            </div>
+        </div>
+    </div>
+    <div id="death-screen">YOU DIED<br><span>RESPAWNING...</span></div>
+    <div id="match-end-screen" class="hidden"></div>
+</div>
+
+<script type="module" src="/src/main.js"></script>
 </body>
 </html>

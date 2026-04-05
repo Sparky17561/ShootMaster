@@ -12,7 +12,7 @@ export function initInput(game) {
     window.addEventListener('keydown', (e) => {
         if (e.code === 'KeyT') {
             game.playerState.controlMode = game.playerState.controlMode === 'pointerlock' ? 'trackpad' : 'pointerlock';
-            
+
             if (game.playerState.controlMode === 'pointerlock') {
                 if (document.pointerLockElement !== container) container.requestPointerLock();
             } else {
@@ -25,7 +25,7 @@ export function initInput(game) {
             return;
         }
 
-        switch(e.code) {
+        switch (e.code) {
             case 'KeyW': game.inputBuffer.forward = true; break;
             case 'KeyS': game.inputBuffer.backward = true; break;
             case 'KeyA': game.inputBuffer.left = true; break;
@@ -37,9 +37,10 @@ export function initInput(game) {
             case 'Digit1': game.inputBuffer.switchIndex = 0; break;
             case 'Digit2': game.inputBuffer.switchIndex = 1; break;
             case 'Digit3': game.inputBuffer.switchIndex = 2; break;
+            case 'Digit4': game.inputBuffer.switchIndex = 3; break;
             case 'KeyG': game.inputBuffer.grenade = true; break;
             case 'KeyR': game.inputBuffer.reload = true; break;
-            case 'KeyP': 
+            case 'KeyP':
                 const debug = document.getElementById('debug-info');
                 debug.classList.toggle('hidden');
                 break;
@@ -47,7 +48,7 @@ export function initInput(game) {
     });
 
     window.addEventListener('keyup', (e) => {
-        switch(e.code) {
+        switch (e.code) {
             case 'KeyW': game.inputBuffer.forward = false; break;
             case 'KeyS': game.inputBuffer.backward = false; break;
             case 'KeyA': game.inputBuffer.left = false; break;
@@ -63,21 +64,36 @@ export function initInput(game) {
 
     // Pointer Lock Events
     container.addEventListener('click', () => {
+        // Prevent clicking background from bypassing lobby
+        const lobby = document.getElementById('lobby-screen');
+        if (lobby && !lobby.classList.contains('hidden')) return;
+
+        // FIX 3: All players (host and joinee alike) can re-acquire pointer lock.
+        // The old code had no host gate here, but the pointerlockchange handler
+        // below was the real asymmetry — it is now fully symmetric for all roles.
         if (game.playerState.controlMode === 'pointerlock' && document.pointerLockElement !== container) {
             container.requestPointerLock();
         }
     });
 
     document.addEventListener('pointerlockchange', () => {
+        // FIX 3: This handler now runs identically for every player role.
+        // There is no isHost check — Joinees get the same pause/resume behaviour.
         if (game.playerState.controlMode === 'pointerlock') {
             if (document.pointerLockElement === container) {
-                instruction.style.display = 'none';
+                // Pointer locked → game is running
+                instruction.classList.add('hidden');
                 document.body.classList.remove('paused');
                 game.isStarted = true;
             } else {
-                instruction.style.display = 'block';
+                // Pointer unlocked → paused (unless match is over)
+                const isMatchEnd = game.missionTimer <= 0 && game.isStarted;
+                if (isMatchEnd) return;
+
+                instruction.classList.remove('hidden');
                 document.body.classList.add('paused');
                 game.isStarted = false;
+                if (typeof game.updatePauseScreen === 'function') game.updatePauseScreen();
             }
         }
     });
@@ -111,7 +127,7 @@ export function initInput(game) {
 
         game.inputBuffer.mouseDelta.x -= dx * sensitivity;
         game.inputBuffer.mouseDelta.y -= dy * sensitivity;
-        
+
         const limit = Math.PI / 2 - 0.1;
         game.inputBuffer.mouseDelta.y = Math.max(-limit, Math.min(limit, game.inputBuffer.mouseDelta.y));
     });

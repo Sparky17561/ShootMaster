@@ -1,0 +1,13 @@
+// render.yaml — Deploy ShootMaster backend to Render.com
+// Upload this file + all project files to a GitHub repo, then connect to Render
+
+services:
+  - type: web
+    name: shootmaster-server
+    env: node
+    buildCommand: npm install
+    startCommand: node server.js
+    envVars:
+      - key: PORT
+        value: 3001
+    autoDeploy: true

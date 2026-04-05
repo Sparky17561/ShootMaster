@@ -38,24 +38,19 @@ export function updateWeapon(game, dt) {
     
     // 1. ADS (FOV Zoom)
     const isSniper = currentWep.name === 'Heavy Sniper';
-    const onHighGround = game.playerState.position.y > 3.0;
-    const targetFOV = (playerState.isADS && (!isSniper || onHighGround)) ? 
-        (isSniper ? 15 : CONFIG.FOV_ADS) : 
-        CONFIG.FOV_BASE;
+    const targetFOV = (playerState.isADS && isSniper) ? 15 :
+                      (playerState.isADS ? CONFIG.FOV_ADS : CONFIG.FOV_BASE);
     playerState.currentFOV += (targetFOV - playerState.currentFOV) * CONFIG.ADS_LERP_SPEED * dt;
 
-    // Sniper Scope Overlay
+    // Sniper Scope Overlay — works whenever holding Sniper + ADS
     const scope = document.getElementById('sniper-scope');
     const xhair = document.getElementById('crosshair');
-    if (isSniper && playerState.isADS && onHighGround) {
-        scope.classList.add('active');
+    if (isSniper && playerState.isADS) {
+        scope.classList.remove('hidden');  // Show scope
         xhair.style.opacity = '0';
     } else {
-        scope.classList.remove('active');
+        scope.classList.add('hidden');     // Hide scope
         xhair.style.opacity = '1';
-        if (isSniper && playerState.isADS && !onHighGround) {
-             playerState.isADS = false; // Auto-cancel if jumping off roof
-        }
     }
 
     // 2. Reloading Logic
@@ -98,7 +93,13 @@ export function updateWeapon(game, dt) {
     playerState.recoilOffset.y *= (1.0 - recoverySpeed * dt);
 
     // 6. Hit Marker Cooldown
-    if (playerState.lastHitTime > 0) playerState.lastHitTime -= dt;
+    if (playerState.lastHitTime > 0) {
+        playerState.lastHitTime -= dt;
+        if (playerState.lastHitTime <= 0 && hitMarker) {
+            hitMarker.classList.add('hidden');
+            hitMarker.classList.remove('hit-animate');
+        }
+    }
 
     // 7. Fade Muzzle Flash
     if (muzzleFlash && muzzleFlash.visible) {
@@ -135,6 +136,11 @@ export function handleShooting(game) {
         if (!bot.userData.isDead) shootables.push(...bot.children);
     });
     shootables.push(...targets);
+
+    // Add Remote Players for PvP
+    Object.values(game.remotePlayers).forEach(rp => {
+        if (rp.mesh) shootables.push(rp.mesh);
+    });
 
     const numPellets = currentWep.pellets || 1;
     let spread = currentWep.isADS ? 0 : (currentWep.spread || 0.02);
@@ -176,15 +182,35 @@ export function handleShooting(game) {
             flashBot(bot, true); 
             bot.userData.hitTimer = 0.1;
             
-            if (bot.userData.health <= 0) {
+            // Handle Local Damage Response for Remote Players
+            if (hitObj.userData.isRemotePlayer) {
+                const victimId = hitObj.userData.playerId;
+                import('./network.js').then(net => {
+                    if (net.emitRemoteDamage) net.emitRemoteDamage(victimId, damage);
+                });
+            }
+
+            if (bot.userData.health <= 0 && !hitObj.userData.isRemotePlayer) {
                 bot.userData.isDead = true;
                 bot.userData.respawnTimer = CONFIG.RESPAWN_DELAY;
-                playerState.score += 1;
-                game.addEvent(isHeadshot ? "HEADSHOT KILL!" : "BOT KILLED", isHeadshot ? "#ffaa00" : "#0f4");
+                bot.userData.isAiming = false;
+                bot.userData.aimTimer = 0;
+                bot.userData.state = 'idle';
                 
-                // LAY DOWN - Physical Rotate
                 bot.rotation.x = -Math.PI / 2;
                 bot.position.y = 0.5;
+                bot.traverse(c => { 
+                    if(c.isMesh) { c.material.color.set(0x555555); c.material.emissive.set(0x000000); } 
+                });
+
+                playerState.score += 1;
+                game.addEvent(isHeadshot ? "HEADSHOT KILL!" : "BOT KILLED", isHeadshot ? "#ffaa00" : "#0f4");
+
+                // Remove laser line immediately
+                if (bot.userData.laserLine) {
+                    game.scene.remove(bot.userData.laserLine);
+                    bot.userData.laserLine = null;
+                }
             }
 
             if (playerState.lastHitTime <= 0) {
@@ -200,6 +226,13 @@ export function handleShooting(game) {
         const tracerStart = camera.position.clone();
         const tracerEnd = tracerStart.clone().addScaledVector(_spreadDir, dist);
         spawnTracer(tracerStart, tracerEnd, game.scene);
+
+        // Network Tracer (Tell others to spawn this tracer)
+        if (game.networkState.connected) {
+            import('./network.js').then(net => {
+                if (net.emitShoot) net.emitShoot(tracerStart, tracerEnd);
+            });
+        }
     }
 
     // 2. Feedback
