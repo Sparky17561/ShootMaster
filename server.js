@@ -236,71 +236,60 @@ io.on('connection', (socket) => {
         });
     });
 
-    // ── REMOTE DAMAGE (Host tells server someone got hit by bot) ──
-    socket.on('remote-damage', ({ victimId, damage }) => {
-        if (!currentRoomId || !rooms[currentRoomId]) return;
-        const room = rooms[currentRoomId];
-        
-        // Host is the only one who should send this
-        if (room.hostId !== socket.id) return;
-
-        const victim = room.players[victimId];
-        if (victim) {
-            victim.health = Math.max(0, (victim.health || 100) - damage);
-            
-            // Tell the victim specifically
-            io.to(victimId).emit('take-damage', {
-                fromName: 'BOT',
-                damage,
-                health: victim.health
-            });
-        }
-    });
-
-    // ── PLAYER UPDATE (position / rotation) ──
-    socket.on('player-update', ({ position, rotation, currentWeapon, health, isAiming, bots, pickups }) => {
-        if (!currentRoomId || !rooms[currentRoomId]) return;
-        const room = rooms[currentRoomId];
-        const player = room.players[socket.id];
-        if (player) {
-            player.position = position || player.position;
-            player.rotation = rotation || player.rotation;
-            player.currentWeapon = currentWeapon || player.currentWeapon;
-            player.health = health !== undefined ? health : (player.health || 100);
-            player.isAiming = !!isAiming;
-
-            socket.to(currentRoomId).emit('player-moved', {
-                id: socket.id,
-                position: player.position,
-                rotation: player.rotation,
-                currentWeapon: player.currentWeapon,
-                health: player.health,
-                isAiming: player.isAiming,
-                bots,
-                pickups
-            });
-        }
-    });
-
-    // ── SHOOT (bullet tracer relay) ──
-    socket.on('shoot', ({ from, to }) => {
-        if (!currentRoomId) return;
-        socket.to(currentRoomId).emit('player-shoot', { from, to });
-    });
-
-    // ── DAMAGE (lethal PvP relay) ──
+    // ── REMOTE DAMAGE (shooter tells server someone was hit) ──
     socket.on('remote-damage', ({ victimId, damage }) => {
         if (!currentRoomId || !rooms[currentRoomId]) return;
         const room = rooms[currentRoomId];
         const shooter = room.players[socket.id];
-        if (shooter) {
+        
+        const victim = room.players[victimId];
+        // Cannot damage a dead player
+        if (victim && shooter && (victim.health || 100) > 0) {
+            victim.health = Math.max(0, (victim.health || 100) - damage);
+            
+            // Tell the victim specifically
             io.to(victimId).emit('take-damage', {
-                amount: damage,
-                killerId: socket.id,
-                killerName: shooter.name
+                fromId: socket.id,
+                fromName: shooter.name,
+                damage,
+                health: victim.health
             });
+
+            // If lethal, update server-side score and broadcast
+            if (victim.health <= 0) {
+                 shooter.score = (shooter.score || 0) + 1;
+                 victim.deaths = (victim.deaths || 0) + 1;
+                 victim.health = 100; // Respawn reset
+
+                 io.to(currentRoomId).emit('player-killed', {
+                     killerId: socket.id,
+                     killerName: shooter.name,
+                     victimId: victimId,
+                     victimName: victim.name,
+                     killerScore: shooter.score,
+                     victimDeaths: victim.deaths
+                 });
+
+                 // Also refresh overall leaderboard
+                 broadcastLeaderboard(currentRoomId);
+            }
         }
     });
+
+    function broadcastLeaderboard(roomId) {
+        if (!rooms[roomId]) return;
+        const leaderboard = Object.values(rooms[roomId].players)
+            .map(p => ({ 
+                id: p.id, 
+                name: p.name, 
+                score: p.score || 0, 
+                deaths: p.deaths || 0,
+                color: p.skinColor
+            }))
+            .sort((a, b) => b.score - a.score);
+        
+        io.to(roomId).emit('leaderboard-update', { leaderboard });
+    }
 
     // ── BOT KILL (update host) ──
     socket.on('bot-kill', (data) => {

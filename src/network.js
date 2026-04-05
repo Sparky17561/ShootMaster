@@ -178,7 +178,7 @@ export function initNetwork(game, roomId, profile) {
             
             const remote = game.remotePlayers[data.id];
             if (remote) {
-                remote.setTarget(data.position, data.rotation, data.health, data.isAiming);
+                remote.setTarget(data.position, data.rotation, data.health, data.isAiming, data.isInvulnerable);
                 remote.currentWeapon = data.currentWeapon;
             }
 
@@ -196,15 +196,15 @@ export function initNetwork(game, roomId, profile) {
         });
 
         // ── DAMAGE / COMBAT ──
-        socket.on('take-damage', ({ fromName, damage, health }) => {
+        socket.on('take-damage', ({ fromId, fromName, damage, health }) => {
             game.playerState.health = health || 0;
-            game.takeDamage(0); // trigger visual only
+            game.takeDamage(0, fromId, fromName); // trigger visual and death if 0
             if (fromName) game.addEvent(`Hit by ${fromName} (-${damage})`, '#f44');
         });
 
         socket.on('player-killed', ({ killerId, killerName, victimId, victimName, killerScore }) => {
             if (victimId === game.networkState.myId) {
-                game.die();
+                game.die(killerId, killerName);
                 game.addEvent(`Killed by ${killerName}`, '#f00');
             }
             if (killerId === game.networkState.myId) {
@@ -374,7 +374,7 @@ export function emitPlayerDied(killerId, killerName, weaponType) {
 }
 
 export function emitRemoteDamage(victimId, damage) {
-    if (!socket || !gameRef.networkState.isHost) return;
+    if (!socket || !gameRef.networkState.connected) return;
     socket.emit('remote-damage', { victimId, damage });
 }
 

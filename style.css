@@ -803,14 +803,34 @@ html, body {
 .pause-menu-card {
     background:rgba(10,10,24,0.95);
     border:1px solid rgba(0,229,255,0.3);
-    border-radius:12px; padding:32px; width:400px;
-    box-shadow:0 0 40px rgba(0,229,255,0.1);
-    display:flex; flex-direction:column; gap:24px;
+    font-size: 10px;
+    letter-spacing: 0.1em;
 }
-.pause-title {
-    font-family:var(--font-a); font-size:32px; font-weight:900;
-    letter-spacing:0.15em; color:#fff; text-align:center;
-    border-bottom:1px solid rgba(255,255,255,0.1); padding-bottom:16px;
+.lb-table td {
+    padding: 10px 8px;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+
+.respawn-btn {
+    background: var(--cyan);
+    color: #000;
+    border: none;
+    padding: 12px 32px;
+    font-family: var(--font-a);
+    font-weight: 900;
+    font-size: 18px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+    box-shadow: 0 0 20px rgba(0,229,255,0.3);
+    margin-top: 15px;
+}
+.respawn-btn:hover {
+    transform: scale(1.05);
+    box-shadow: 0 0 30px rgba(0,229,255,0.5);
+}
+.respawn-btn:active {
+    transform: scale(0.95);
 }
 .pause-stats {
     display:flex; justify-content:space-between; gap:12px;
@@ -827,14 +847,32 @@ html, body {
 /* Death Screen */
 #death-screen {
     position:fixed; inset:0; z-index:100;
-    display:none; align-items:center; justify-content:center; flex-direction:column;
-    text-align:center; background:rgba(0,0,0,0.78);
-    font-family:var(--font-a); font-size:38px; font-weight:900; color:#fff; letter-spacing:0.1em;
-    text-shadow:0 0 30px rgba(0,229,255,0.4);
+    display:none; align-items:center; justify-content:center;
+    background:rgba(5, 0, 5, 0.85); backdrop-filter:blur(10px);
 }
-#death-screen span {
-    display:block; font-size:13px; font-weight:400; letter-spacing:0.3em;
-    color:var(--muted); margin-top:12px;
+.death-content {
+    background: linear-gradient(180deg, rgba(20,10,15,0.95) 0%, rgba(10,10,15,0.98) 100%);
+    border: 1px solid rgba(255, 50, 80, 0.3);
+    box-shadow: 0 0 50px rgba(255, 0, 50, 0.1);
+    padding:40px; border-radius:12px;
+    text-align:center;
+    display:flex; flex-direction:column; align-items:center;
+    min-width: 450px;
+}
+.death-title {
+    font-family:var(--font-a); font-size:48px; font-weight:900;
+    color: #ff3344; letter-spacing:0.15em; margin:0 0 8px 0;
+    text-shadow:0 0 20px rgba(255,0,50,0.4);
+}
+.killer-name {
+    font-family:var(--font-b); font-size:14px; font-weight:700;
+    color: #fff; letter-spacing:0.15em; margin-bottom: 20px;
+    opacity: 0.8;
+}
+.respawn-timer-sub {
+    font-family:var(--font-b); font-size:12px; font-weight: 700;
+    color:var(--muted); margin-top:20px; letter-spacing:0.2em;
+    text-transform: uppercase;
 }
 
 /* Debug */

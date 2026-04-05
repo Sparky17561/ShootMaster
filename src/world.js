@@ -37,6 +37,14 @@ let _cachedTargetSnipers = 0;
 // ─────────────────────────────────────────────────────────────────────────────
 
 export function initWorld(scene, game) {
+    // Hard Reset state to prevent leakage between rounds
+    bots.length = 0;
+    obstacles.length = 0;
+    mapStructure.length = 0;
+    healthKits.length = 0;
+    ammoBoxes.length = 0;
+    _cachedSniperCount = 0;
+
     _gameRef = game;
 
     // 1. Lighting & Fog
@@ -670,10 +678,12 @@ export function updateBots(game, dt, playerHitbox) {
                         const firstHit = allHits[0];
                         hitDist = firstHit.distance;
                         if (firstHit.object === playerHitbox) {
-                            game.takeDamage(cfg.damage);
+                            game.takeDamage(cfg.damage, null, bot.userData.botType);
                         } else if (firstHit.object.userData?.isRemotePlayer) {
                             const victimId = firstHit.object.userData.playerId;
-                            if (victimId && game.emitRemoteDamage) game.emitRemoteDamage(victimId, cfg.damage);
+                            import('./network.js').then(net => {
+                                if (net.emitRemoteDamage) net.emitRemoteDamage(victimId, cfg.damage);
+                            });
                         }
                     }
 

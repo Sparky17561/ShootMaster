@@ -140,6 +140,7 @@ export function handleShooting(game) {
     // Add Remote Players for PvP
     Object.values(game.remotePlayers).forEach(rp => {
         if (rp.mesh) shootables.push(rp.mesh);
+        if (rp.headMesh) shootables.push(rp.headMesh);
     });
 
     const numPellets = currentWep.pellets || 1;
@@ -168,13 +169,21 @@ export function handleShooting(game) {
             const bot = hitObj.userData.parentBot || hitObj;
             if (bot.userData.isDead) continue; // Safety guard for multi-part bots
             
+            const dist = intersects[0].distance;
             let damage = currentWep.damage;
             let isHeadshot = false;
 
-            if (hitObj.userData.isHead) {
-                damage = 999;
+            if (hitObj.userData.isHead || hitObj.userData.isRemoteHead) {
+                damage *= (currentWep.headshotMult || 2.0);
                 isHeadshot = true;
             }
+
+            // Shotgun Falloff
+            if (currentWep.name === 'Shotgun' && dist > (currentWep.shotgunFalloffRange || 15.0)) {
+                damage *= 0.2; // 80% reduction
+            }
+
+            damage = Math.round(damage);
 
             bot.userData.health -= damage;
 

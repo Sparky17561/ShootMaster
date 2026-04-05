@@ -46,6 +46,9 @@ export class RemotePlayer {
         const headMat = new THREE.MeshStandardMaterial({ color: 0xffcc88 });
         this.headMesh = new THREE.Mesh(headGeom, headMat);
         this.headMesh.position.set(0, 1.15, 0);
+        this.headMesh.userData.isRemoteHead = true;
+        this.headMesh.userData.isRemotePlayer = true;
+        this.headMesh.userData.playerId = this.id;
         this.mesh.add(this.headMesh);
 
         // Name label (canvas texture)
@@ -84,11 +87,12 @@ export class RemotePlayer {
         return sprite;
     }
 
-    setTarget(position, rotation, health, isAiming) {
+    setTarget(position, rotation, health, isAiming, isInvulnerable) {
         this._targetPos.set(position.x, position.y, position.z);
         this._targetYaw = rotation.yaw;
         this.health = health !== undefined ? health : this.health;
         this.isAiming = !!isAiming;
+        this.isInvulnerable = !!isInvulnerable;
     }
 
     update(dt) {
@@ -107,15 +111,30 @@ export class RemotePlayer {
             if (!this._laserLine) {
                 const geom = new THREE.BufferGeometry().setFromPoints([
                     new THREE.Vector3(0, 1.15, 0), // from head height
-                    new THREE.Vector3(0, 1.15, 50)  // forward 50m
+                    new THREE.Vector3(0, 1.15, -50) // forward (Z-) 50m
                 ]);
                 const mat = new THREE.LineBasicMaterial({ color: 0xff0000, transparent: true, opacity: 0.5 });
                 this._laserLine = new THREE.Line(geom, mat);
-                this.mesh.add(this._laserLine);
+                this.scene.add(this._laserLine);
             }
+            this._laserLine.position.copy(this._currentPos);
+            this._laserLine.rotation.y = this._currentYaw;
             this._laserLine.visible = true;
         } else if (this._laserLine) {
             this._laserLine.visible = false;
+        }
+
+        // --- Invulnerability Shield Visual ---
+        if (this.mesh && this.mesh.material) {
+            if (this.isInvulnerable) {
+                // Flash white
+                this.mesh.material.emissive.set(0xffffff);
+                this.mesh.material.emissiveIntensity = 1.0;
+            } else {
+                // Restore original color
+                this.mesh.material.emissive.set(this.skinColor);
+                this.mesh.material.emissiveIntensity = 0.2;
+            }
         }
     }
 

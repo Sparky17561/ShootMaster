@@ -125,6 +125,13 @@ class Game {
 
     async startGame(profile) {
         this.playerProfile = profile;
+        this._resetState();
+
+        // Ensure 100% bot cleanup in PvP
+        if (profile.mode === 'pvp') {
+            bots.forEach(bot => this.scene.remove(bot));
+            bots.length = 0;
+        }
 
         // Hiding the specific main menu / setup screen is handled by menu.js.
         // We do NOT hide screens-layer here because we might need to show the Lobby.
@@ -237,19 +244,38 @@ class Game {
         if (matchEnd) matchEnd.style.display = 'none';
 
         // Reset state
-        this.playerState.score = 0;
-        this.playerState.deaths = 0;
-        this.playerState.health = 100;
-        this.playerState.isDead = false;
-        this.playerState.position = { x: 0, y: CONFIG.PLAYER_HEIGHT, z: 80 };
-        this.playerState.velocity = { x: 0, y: 0, z: 0 };
-        this.missionTimer = CONFIG.MISSION_TIME;
+        this._resetState();
 
         // Clean Remote Players
         Object.keys(this.remotePlayers).forEach(id => this.removeRemotePlayer(id));
 
         const menu = document.getElementById('main-menu');
         if (menu) menu.classList.remove('hidden');
+    }
+
+    _resetState() {
+        this.playerState.score = 0;
+        this.playerState.deaths = 0;
+        this.playerState.health = 100;
+        this.playerState.isDead = false;
+        this.playerState.position = { x: 0, y: CONFIG.PLAYER_HEIGHT, z: 80 };
+        this.playerState.velocity = { x: 0, y: 0, z: 0 };
+        this.playerState.grenades = 3; 
+        this.missionTimer = CONFIG.MISSION_TIME;
+        
+        // Reset Ammo
+        this.playerState.inventory = [
+            { ...CONFIG.WEAPONS.PISTOL },
+            { ...CONFIG.WEAPONS.RIFLE },
+            { ...CONFIG.WEAPONS.SHOTGUN },
+            { ...CONFIG.WEAPONS.SNIPER }
+        ];
+
+        // Reset Input Buffer
+        Object.keys(this.inputBuffer).forEach(key => {
+            if (typeof this.inputBuffer[key] === 'boolean') this.inputBuffer[key] = false;
+            if (key === 'mouseDelta') { this.inputBuffer.mouseDelta.x = 0; this.inputBuffer.mouseDelta.y = 0; }
+        });
     }
 
     // ──────────────────────────────────────────────────────────────────────────
@@ -363,10 +389,9 @@ class Game {
             updateBots(this, dt, this.playerHitbox);
         }
 
-        // Respawn
+        // Respawn Timer (HUD only)
         if (this.playerState.isDead) {
-            this.playerState.respawnTimer -= dt;
-            if (this.playerState.respawnTimer <= 0) this.respawnPlayer();
+            this.playerState.respawnTimer = Math.max(0, this.playerState.respawnTimer - dt);
         }
     }
 
@@ -420,7 +445,7 @@ class Game {
     // ──────────────────────────────────────────────────────────────────────────
 
     takeDamage(amount, killerId, killerName) {
-        if (this.playerState.isDead) return;
+        if (this.playerState.isDead || this.playerState.isInvulnerable) return;
         if (amount > 0) {
             this.playerState.health = Math.max(0, this.playerState.health - amount);
         }
@@ -446,6 +471,20 @@ class Game {
              deathScreen.style.display = 'flex';
              const killerInfo = document.getElementById('death-killer-info');
              if (killerInfo) killerInfo.textContent = `ELIMINATED BY ${killerName || 'THE ARENA'}`;
+             
+             // Update leaderboard on death screen
+             this.updateDeathLeaderboard();
+             
+             // Setup click to respawn
+             const respawnBtn = document.getElementById('respawn-btn');
+             if (respawnBtn) {
+                 respawnBtn.style.display = 'block';
+                 respawnBtn.onclick = () => {
+                     if (this.playerState.isDead && this.playerState.respawnTimer <= 0) {
+                         this.respawnPlayer();
+                     }
+                 };
+             }
         }
         
         document.body.classList.add('dead');
@@ -454,14 +493,72 @@ class Game {
         emitPlayerDied(killerId, killerName);
     }
 
+    updateDeathLeaderboard() {
+        const lbContainer = document.getElementById('death-leaderboard');
+        if (!lbContainer) return;
+
+        // If Single Player (Solo) - Show Player Stats
+        if (this.playerProfile.mode === 'solo' || !this.networkState.connected) {
+            const k = this.playerState.score || 0;
+            const d = this.playerState.deaths || 0;
+            const kd = d === 0 ? k : (k / d).toFixed(2);
+            lbContainer.innerHTML = `
+                <div class="solo-stats">
+                    <p style="color:var(--cyan);font-size:12px;margin:0">YOUR PERFORMANCE</p>
+                    <div style="display:flex;gap:20px;justify-content:center;margin-top:10px;">
+                        <div><span style="display:block;font-size:32px;color:#fff">${k}</span><span style="font-size:10px;color:var(--muted)">KILLS</span></div>
+                        <div><span style="display:block;font-size:32px;color:#fff">${d}</span><span style="font-size:10px;color:var(--muted)">DEATHS</span></div>
+                        <div><span style="display:block;font-size:32px;color:var(--gold)">${kd}</span><span style="font-size:10px;color:var(--muted)">K/D</span></div>
+                    </div>
+                </div>`;
+            return;
+        }
+
+        // Multiplayer Leaderboard
+        if (!this.networkState.leaderboard) return;
+        let html = '<table class="lb-table"><tr><th>PLAYER</th><th>K</th><th>D</th></tr>';
+        this.networkState.leaderboard.slice(0, 5).forEach(p => {
+            html += `<tr><td style="color:${p.color}">${p.name}</td><td>${p.score}</td><td>${p.deaths}</td></tr>`;
+        });
+        html += '</table>';
+        lbContainer.innerHTML = html;
+    }
+
     respawnPlayer() {
-        this.playerState.isDead = false;
-        this.playerState.health = 100;
-        this.playerState.position = { x: (Math.random() - 0.5) * 30, y: CONFIG.PLAYER_HEIGHT, z: (Math.random() - 0.5) * 30 };
+        this._resetState();
+        this.playerState.isInvulnerable = true;
+
+        // Strategic Spawning: Furthest from all enemies
+        let bestPoint = CONFIG.SPAWN_POINTS[0];
+        let maxDist = -1;
+        
+        CONFIG.SPAWN_POINTS.forEach(pt => {
+            let totalDist = 0;
+            const rps = Object.values(this.remotePlayers);
+            if (rps.length === 0) {
+                totalDist = Math.random() * 100; // Random if alone
+            } else {
+                rps.forEach(rp => {
+                    const d = Math.sqrt((pt.x - rp.mesh.position.x)**2 + (pt.z - rp.mesh.position.z)**2);
+                    totalDist += d;
+                });
+            }
+            if (totalDist > maxDist) {
+                maxDist = totalDist;
+                bestPoint = pt;
+            }
+        });
+
+        this.playerState.position = { x: bestPoint.x, y: bestPoint.y, z: bestPoint.z };
         this.playerState.velocity = { x: 0, y: 0, z: 0 };
         document.body.classList.remove('dead');
         const deathScreen = document.getElementById('death-screen');
         if (deathScreen) deathScreen.style.display = 'none';
+
+        // Shield Timeout
+        setTimeout(() => {
+            this.playerState.isInvulnerable = false;
+        }, CONFIG.SPAWN_SHIELD_DURATION * 1000);
     }
 
     // ──────────────────────────────────────────────────────────────────────────
@@ -605,6 +702,28 @@ class Game {
             if (this.playerState.isShooting) spreadBase += 15;
             if (this.playerState.isADS) spreadBase = 2;
             crosshair.style.setProperty('--spread', `${spreadBase}px`);
+        }
+
+        // Death Screen UI Updates
+        if (this.playerState.isDead) {
+            const respawnBtn = document.getElementById('respawn-btn');
+            const timerSub = document.querySelector('.respawn-timer-sub');
+            
+            if (this.playerState.respawnTimer > 0) {
+                if (respawnBtn) {
+                    respawnBtn.style.opacity = '0.3';
+                    respawnBtn.style.cursor = 'not-allowed';
+                    respawnBtn.textContent = `PREPARING (${Math.ceil(this.playerState.respawnTimer)}s)`;
+                }
+                if (timerSub) timerSub.textContent = "Wait for tactical readiness...";
+            } else {
+                if (respawnBtn) {
+                    respawnBtn.style.opacity = '1';
+                    respawnBtn.style.cursor = 'pointer';
+                    respawnBtn.textContent = 'ENTER THE ARENA';
+                }
+                if (timerSub) timerSub.textContent = "DROPSHIP READY. PRESS [ENTER] TO DEPLOY.";
+            }
         }
 
         // Debug

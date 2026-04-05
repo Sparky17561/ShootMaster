@@ -40,6 +40,11 @@ export function initInput(game) {
             case 'Digit4': game.inputBuffer.switchIndex = 3; break;
             case 'KeyG': game.inputBuffer.grenade = true; break;
             case 'KeyR': game.inputBuffer.reload = true; break;
+            case 'Enter':
+                if (game.playerState.isDead && (game.playerState.respawnTimer || 0) <= 0) {
+                    game.respawnPlayer();
+                }
+                break;
             case 'KeyP':
                 const debug = document.getElementById('debug-info');
                 debug.classList.toggle('hidden');

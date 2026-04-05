@@ -38,11 +38,23 @@ export const CONFIG = {
     RESPAWN_DELAY: 2.0,
     MIN_SPAWN_DISTANCE: 15.0,
     DEATH_ANIMATION_SPEED: 10.0,
+    SPAWN_SHIELD_DURATION: 2.0, // 2s Invulnerability
+
+    SPAWN_POINTS: [
+        { x: 120, y: 1, z: 120 },
+        { x: -120, y: 1, z: -120 },
+        { x: 120, y: 1, z: -120 },
+        { x: -120, y: 1, z: 120 },
+        { x: 0, y: 1, z: 140 },
+        { x: 0, y: 1, z: -140 },
+        { x: 140, y: 1, z: 0 },
+        { x: -140, y: 1, z: 0 }
+    ],
     // Weapons
     WEAPONS: {
         PISTOL: {
             name: 'Pistol',
-            damage: 34,
+            damage: 9, // 10-12 body shots
             fireRate: 0.3,
             magSize: 12,
             ammo: 12,
@@ -50,11 +62,12 @@ export const CONFIG = {
             isAutomatic: false,
             spread: 0.005,
             recoil: 0.05,
-            reloadTime: 1.5
+            reloadTime: 1.5,
+            headshotMult: 6.0 // 2 shots to head
         },
         RIFLE: {
             name: 'Auto Rifle',
-            damage: 22,
+            damage: 15, // 6-7 body shots
             fireRate: 0.1,
             magSize: 30,
             ammo: 30,
@@ -62,12 +75,14 @@ export const CONFIG = {
             isAutomatic: true,
             spread: 0.015,
             recoil: 0.02, 
-            reloadTime: 2.0
+            reloadTime: 2.0,
+            headshotMult: 2.5 // 2-3 headshots
         },
         SHOTGUN: {
             name: 'Shotgun',
-            damage: 15,
+            damage: 15, // 8 pellets * 15 = 120 total possible (Instant Kill close)
             pellets: 8,
+            shotgunFalloffRange: 15.0, // Damage drop after 15m
             fireRate: 0.8,
             magSize: 6,
             ammo: 6,
@@ -75,11 +90,12 @@ export const CONFIG = {
             isAutomatic: false,
             spread: 0.12,
             recoil: 0.25,
-            reloadTime: 3.0
+            reloadTime: 3.0,
+            headshotMult: 1.5
         },
         SNIPER: {
             name: 'Heavy Sniper',
-            damage: 999, // One-Shot
+            damage: 100, // 1 shot kill
             fireRate: 1.2,
             magSize: 5,
             ammo: 5,
@@ -88,7 +104,8 @@ export const CONFIG = {
             spread: 0.0,
             recoil: 1.2,
             reloadTime: 3.5,
-            fov: 15 // High zoom
+            fov: 15,
+            headshotMult: 4.0 // Instant headshot kill (55 * 4 = 220)
         }
     },
     // Visual Effects
