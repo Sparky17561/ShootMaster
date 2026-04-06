@@ -624,7 +624,7 @@ class Game {
         const ammoTextReserve = (currentWep.reserve === Infinity || currentWep.reserve === null) ? '∞' : currentWep.reserve;
 
         // Stats text
-        const killEl = document.getElementById('kill-display');
+        const killEl = document.getElementById('kill-counter');
         if (killEl) killEl.textContent = `KILLS: ${this.playerState.score || 0}`;
         const fpsEl = document.getElementById('fps-counter');
         if (fpsEl) fpsEl.textContent = `FPS: ${Math.round(1 / Math.max(dt, 0.001))}`;

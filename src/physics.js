@@ -152,18 +152,15 @@ export function updatePhysics(game, dt) {
             const distFromTop = playerFeetY - box.max.y;
 
             // 1. FEET: Ground / Ledge / Step Up
-            if (distFromTop > -1.5 && distFromTop < 0.2) {
+            if (distFromTop > -1.2 && distFromTop < 0.2) {
                 playerState.position.y = box.max.y + targetHeight;
                 playerState.velocity.y = 0;
                 isStandingOnSomething = true;
             }
-            // 2. HEAD: Ceiling
-            else if (playerHeadY > box.min.y && playerState.position.y < box.max.y) {
-                playerState.position.y = box.min.y - 0.2;
-                playerState.velocity.y = 0;
-            }
-            // 3. BODY: Walls
-            else if (playerHeadY > box.min.y && playerFeetY < box.max.y) {
+            // 2. BODY: Walls (Horizontal resolution)
+            // Only resolve horizontal if we aren't already resolving vertically.
+            // Check if player's head is above box bottom and feet are below box top.
+            else if (playerHeadY > box.min.y + 0.2 && playerFeetY < box.max.y - 0.2) {
                 const overlapX = Math.min(curMaxX, box.max.x) - Math.max(curMinX, box.min.x);
                 const overlapZ = Math.min(curMaxZ, box.max.z) - Math.max(curMinZ, box.min.z);
 
@@ -176,6 +173,11 @@ export function updatePhysics(game, dt) {
                     playerState.position.z += (overlapZ + 0.05) * dir;
                     playerState.velocity.z = 0;
                 }
+            }
+            // 3. HEAD: Ceiling
+            else if (playerHeadY > box.min.y && playerState.position.y < box.min.y) {
+                playerState.position.y = box.min.y - 0.1;
+                playerState.velocity.y = 0;
             }
         }
     });

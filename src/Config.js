@@ -17,9 +17,9 @@ export const CONFIG = {
     SLIDE_MAX_DURATION: 0.8,
     SLIDE_COOLDOWN: 1.5,
     SLIDE_FRICTION: 2.0,
-    SLIDE_THRESHOLD: 15.0, 
-    SLIDE_FOV_MOD: 10,       
-    SLIDE_TILT: 0.05,       
+    SLIDE_THRESHOLD: 15.0,
+    SLIDE_FOV_MOD: 10,
+    SLIDE_TILT: 0.05,
 
     MISSION_TIME: 300, // 5 Minutes
     // Step-Up (Stair Climbability)
@@ -32,7 +32,7 @@ export const CONFIG = {
     // Trackpad Mode
     TRACKPAD_SENSITIVITY: 0.0012,
     TRACKPAD_SMOOTHING: 0.1,
-    DELTA_SPIKE_THRESHOLD: 100, 
+    DELTA_SPIKE_THRESHOLD: 100,
 
     // Gameplay Loop
     RESPAWN_DELAY: 2.0,
@@ -74,7 +74,7 @@ export const CONFIG = {
             reserve: 90,
             isAutomatic: true,
             spread: 0.015,
-            recoil: 0.02, 
+            recoil: 0.02,
             reloadTime: 2.0,
             headshotMult: 2.5 // 2-3 headshots
         },
@@ -106,6 +106,12 @@ export const CONFIG = {
             reloadTime: 3.5,
             fov: 15,
             headshotMult: 4.0 // Instant headshot kill (55 * 4 = 220)
+        },
+        GRENADE: {
+            damage: 80,
+            radius: 12.0,
+            fuse: 3.0,
+            tossForce: 25.0
         }
     },
     // Visual Effects
@@ -123,9 +129,9 @@ export const CONFIG = {
     FOV_BASE: 75,
     FOV_ADS: 45,
     ADS_LERP_SPEED: 10,
-    
+
     // Hit Marker
-    HIT_COOLDOWN: 0.25, 
+    HIT_COOLDOWN: 0.25,
 
     // Bots
     BOT_COUNT: 15,
