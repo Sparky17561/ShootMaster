@@ -18,6 +18,7 @@ const _dirToPlayer = new THREE.Vector3();
 const _strafeVec = new THREE.Vector3();
 let _gameRef = null;
 
+
 // ── Persistent, pre-allocated working arrays ──────────────────────────────────
 // These are built ONCE (or rebuilt only when player count changes) and reused
 // every frame. No spread operators, no .filter(), no .map() in the hot path.
@@ -166,6 +167,7 @@ export function initWorld(scene, game) {
             emissiveIntensity: isSniper ? 5.0 : 0.5
         });
         const head = new THREE.Mesh(headGeom, headMat);
+        head.userData.isHead = true;
         head.userData.isHead = true;
         head.userData.parentBot = botGroup;
         botGroup.add(head);
@@ -386,11 +388,13 @@ function explode(pos, game) {
         const bot = bots[i];
         if (bot.userData.isDead) continue;
         const dist = bot.position.distanceTo(pos);
-        if (dist < CONFIG.WEAPONS.GRENADE.radius) {
+        if (dist <= CONFIG.WEAPONS.GRENADE.radius) {
             bot.userData.health -= CONFIG.WEAPONS.GRENADE.damage;
             flashBot(bot, true);
             bot.userData.hitTimer = 0.2;
-            if (bot.userData.health <= 0) _killBot(bot, game, "GRENADE KILL!");
+            if (bot.userData.health <= 0 && !bot.userData.isDead) {
+            _killBot(bot, game, "GRENADE KILL!");
+            }
         }
     }
 
