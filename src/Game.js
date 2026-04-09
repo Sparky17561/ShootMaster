@@ -3,7 +3,7 @@ import { CONFIG } from './Config.js';
 import { updateInput, initInput } from './input.js';
 import { updatePhysics } from './physics.js';
 import { updateWeapon, initWeapon } from './weapon.js';
-import { initWorld, updateWorld, updateBots, bots, obstacles, mapStructure } from './world.js';
+import { initWorld, updateWorld, updateBots, clearAllBots, spawnBots, bots, obstacles, mapStructure } from './world.js';
 import { RemotePlayer } from './RemotePlayer.js';
 import { initNetwork, sendChatMessage, isConnected, disconnect, emitStartGame, emitLeaveRoom, emitPlayerDied, clearChat } from './network.js';
 
@@ -127,11 +127,8 @@ class Game {
         this.playerProfile = profile;
         this._resetState();
 
-        // Ensure 100% bot cleanup in PvP
-        if (profile.mode === 'pvp') {
-            bots.forEach(bot => this.scene.remove(bot));
-            bots.length = 0;
-        }
+        // Always ensure a clean bot state before starting any match logic
+        clearAllBots(this.scene);
 
         // Hiding the specific main menu / setup screen is handled by menu.js.
         // We do NOT hide screens-layer here because we might need to show the Lobby.
@@ -210,6 +207,11 @@ class Game {
 
     startNetworkMatch() {
         this.isStarted = true;
+
+        // Spawn bots if we are the authority (Solo or PvP Host)
+        if (this.playerProfile.mode === 'solo' || this.networkState.isHost) {
+            spawnBots(this.scene, this);
+        }
         
         // Hide screens-layer and show game
         const screensLayer = document.getElementById('screens-layer');
@@ -243,8 +245,9 @@ class Game {
         const matchEnd = document.getElementById('match-end-screen');
         if (matchEnd) matchEnd.style.display = 'none';
 
-        // Reset state
+        // Reset state & clear world
         this._resetState();
+        clearAllBots(this.scene);
 
         // Clean Remote Players
         Object.keys(this.remotePlayers).forEach(id => this.removeRemotePlayer(id));
@@ -465,15 +468,16 @@ class Game {
         this.playerState.isDead = true;
         this.playerState.deaths = (this.playerState.deaths || 0) + 1;
         this.playerState.respawnTimer = CONFIG.PLAYER_RESPAWN_TIME;
-        
+        this.playerState.velocity.x = 0;
+        this.playerState.velocity.z = 0;
+
+        // Force UI update
+        document.body.classList.add('dead');
         const deathScreen = document.getElementById('death-screen');
         if (deathScreen) {
              deathScreen.style.display = 'flex';
              const killerInfo = document.getElementById('death-killer-info');
              if (killerInfo) killerInfo.textContent = `ELIMINATED BY ${killerName || 'THE ARENA'}`;
-             
-             // Update leaderboard on death screen
-             this.updateDeathLeaderboard();
              
              // Setup click to respawn
              const respawnBtn = document.getElementById('respawn-btn');
@@ -487,9 +491,11 @@ class Game {
              }
         }
         
-        document.body.classList.add('dead');
-        this.playerState.velocity.x = 0;
-        this.playerState.velocity.z = 0;
+        // Secondary/Network tasks (safer here)
+        try {
+            this.updateDeathLeaderboard();
+        } catch (e) { console.error("Leaderboard UI update failed:", e); }
+
         emitPlayerDied(killerId, killerName);
     }
 
@@ -508,16 +514,22 @@ class Game {
                     <div style="display:flex;gap:20px;justify-content:center;margin-top:10px;">
                         <div><span style="display:block;font-size:32px;color:#fff">${k}</span><span style="font-size:10px;color:var(--muted)">KILLS</span></div>
                         <div><span style="display:block;font-size:32px;color:#fff">${d}</span><span style="font-size:10px;color:var(--muted)">DEATHS</span></div>
+                        <div><span style="font-size:10px;color:var(--muted)"></span></div>
                         <div><span style="display:block;font-size:32px;color:var(--gold)">${kd}</span><span style="font-size:10px;color:var(--muted)">K/D</span></div>
                     </div>
                 </div>`;
             return;
         }
 
-        // Multiplayer Leaderboard
-        if (!this.networkState.leaderboard) return;
+        // Multiplayer Leaderboard (Safety check on array-like data)
+        const lb = this.networkState.leaderboard;
+        if (!lb || !Array.isArray(lb)) {
+            lbContainer.innerHTML = "<div style='color:var(--muted);font-size:11px;text-align:center;'>Waiting for tactical data...</div>";
+            return;
+        }
+
         let html = '<table class="lb-table"><tr><th>PLAYER</th><th>K</th><th>D</th></tr>';
-        this.networkState.leaderboard.slice(0, 5).forEach(p => {
+        lb.slice(0, 5).forEach(p => {
             html += `<tr><td style="color:${p.color}">${p.name}</td><td>${p.score}</td><td>${p.deaths}</td></tr>`;
         });
         html += '</table>';
@@ -602,9 +614,9 @@ class Game {
             chatInput.blur();
         });
 
-        // Enter to focus chat, Escape to blur
         window.addEventListener('keydown', (e) => {
-            if (e.code === 'Enter' && this.playerProfile.mode === 'pvp' && document.activeElement !== chatInput) {
+            // Enter to focus chat - ONLY if not dead (to avoid overlap with respawn)
+            if (e.code === 'Enter' && this.playerProfile.mode === 'pvp' && !this.playerState.isDead && document.activeElement !== chatInput) {
                 e.preventDefault();
                 chatInput.focus();
             }
@@ -669,6 +681,12 @@ class Game {
             else if (currentWep.ammo === 0) { banner.textContent = '⚠ OUT OF AMMO'; banner.classList.remove('hidden'); }
             else if (currentWep.ammo < currentWep.magSize * 0.3) { banner.textContent = '⚠ LOW AMMO'; banner.classList.remove('hidden'); }
             else banner.classList.add('hidden');
+        }
+
+        // Chat Hint in PvP (strictly pvp only)
+        const chatHint = document.getElementById('chat-hint');
+        if (chatHint) {
+            chatHint.style.display = (this.playerProfile.mode === 'pvp' && !this.playerState.isDead) ? 'block' : 'none';
         }
 
         // Mission Timer
@@ -915,8 +933,13 @@ class Game {
         // Update Lobby specific UI
         const terminateBtn = document.getElementById('lobby-terminate-btn');
 
-        if (gameInstance.networkState.myId === hostId) {
-            if (startBtn) startBtn.style.display = 'flex';
+        if (gameInstance.networkState.myId === hostId || gameInstance.networkState.isHost) {
+            if (startBtn) {
+                startBtn.style.display = 'flex';
+                startBtn.style.visibility = 'visible';
+                startBtn.style.opacity = '1';
+                startBtn.style.zIndex = '10001';
+            }
             if (terminateBtn) terminateBtn.style.display = 'flex';
             if (waitingMsg) waitingMsg.classList.add('hidden');
         } else {

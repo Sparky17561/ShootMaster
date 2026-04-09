@@ -136,12 +136,26 @@ export function initWorld(scene, game) {
         createRamp(scene, rampStart, 20, 8, 12, platformMaterial);
     });
 
-    // 6. Bots (ONLY in Solo or Vs Bots modes, Not in Pure PvP)
+    // 6. Bots (Spawn initially via spawnBots)
+    spawnBots(scene, game);
+
+    // 7. Pickups
+    initPickups(scene, game);
+
+    // 8. Cache AABBs
+    obstacles.forEach(obs => {
+        obs.userData.aabb = new THREE.Box3().setFromObject(obs);
+    });
+}
+
+/**
+ * Spawns the standard bot contingent.
+ * Can be called multiple times (ensure clearAllBots() is called first to avoid duplicates).
+ */
+export function spawnBots(scene, game) {
     _cachedSniperCount = 0;
-    const isPvP = game.playerProfile && game.playerProfile.mode === 'pvp';
     
-    if (!isPvP) {
-        for (let i = 0; i < CONFIG.BOT_COUNT; i++) {
+    for (let i = 0; i < CONFIG.BOT_COUNT; i++) {
         const botGroup = new THREE.Group();
         const isSniper = Math.random() < CONFIG.BOT_TYPES.SNIPER.probability;
         const botType = isSniper ? 'SNIPER' : 'GRUNT';
@@ -168,7 +182,6 @@ export function initWorld(scene, game) {
         });
         const head = new THREE.Mesh(headGeom, headMat);
         head.userData.isHead = true;
-        head.userData.isHead = true;
         head.userData.parentBot = botGroup;
         botGroup.add(head);
 
@@ -191,15 +204,27 @@ export function initWorld(scene, game) {
         scene.add(botGroup);
         bots.push(botGroup);
     }
-    }
+}
 
-    // 7. Pickups
-    initPickups(scene, game);
-
-    // 8. Cache AABBs
-    obstacles.forEach(obs => {
-        obs.userData.aabb = new THREE.Box3().setFromObject(obs);
+/**
+ * Robust Bot Cleanup
+ * Removes all bots from scene, clears arrays, and resets internal state.
+ */
+export function clearAllBots(scene) {
+    bots.forEach(bot => {
+        if (bot.userData.laserLine) scene.remove(bot.userData.laserLine);
+        scene.remove(bot);
+        bot.traverse(child => {
+            if (child.geometry) child.geometry.dispose();
+            if (child.material) {
+                if (Array.isArray(child.material)) child.material.forEach(m => m.dispose());
+                else child.material.dispose();
+            }
+        });
     });
+    bots.length = 0;
+    _cachedSniperCount = 0;
+    _botAiAccumulator = 0;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -433,7 +458,6 @@ function _killBot(bot, game, eventLabel) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export function updateBots(game, dt, playerHitbox) {
-    if (game.playerProfile && game.playerProfile.mode === 'pvp') return; 
     
     // Accumulate real time; skip if a full AI tick hasn't elapsed yet
     _botAiAccumulator += dt;

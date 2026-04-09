@@ -10,15 +10,16 @@ export function initInput(game) {
 
     // KEY DOWN
     window.addEventListener('keydown', (e) => {
-
+        if (!game.isStarted) return;
         if (document.activeElement.tagName === 'INPUT') return;
 
+        // Toggle Control Mode (Works even when dead)
         if (e.code === 'KeyT') {
             game.playerState.controlMode =
                 game.playerState.controlMode === 'pointerlock' ? 'trackpad' : 'pointerlock';
 
             if (game.playerState.controlMode === 'pointerlock') {
-                if (document.pointerLockElement !== container) container.requestPointerLock();
+                if (document.pointerLockElement !== game.container) game.container.requestPointerLock();
             } else {
                 document.exitPointerLock();
                 game.isStarted = true;
@@ -29,6 +30,24 @@ export function initInput(game) {
             firstMove = true;
             return;
         }
+
+        // Respawn / Enter Arena (Works even when dead)
+        if (e.code === 'Enter') {
+            if (game.playerState.isDead && (game.playerState.respawnTimer || 0) <= 0) {
+                game.respawnPlayer();
+            }
+            return;
+        }
+
+        // Toggle Debug (Works even when dead)
+        if (e.code === 'KeyP') {
+            const debug = document.getElementById('debug-info');
+            if (debug) debug.classList.toggle('hidden');
+            return;
+        }
+
+        // Block all other movement/combat actions if dead
+        if (game.playerState.isDead) return;
 
         switch (e.code) {
             case 'KeyW': game.inputBuffer.forward = true; break;
@@ -46,27 +65,12 @@ export function initInput(game) {
             case 'Digit3': game.inputBuffer.switchIndex = 2; break;
             case 'Digit4': game.inputBuffer.switchIndex = 3; break;
 
-            // GRENADE HOLD
-            case 'KeyG':
-                game.inputBuffer.grenade = true;
-                break;
+            case 'KeyG': game.inputBuffer.grenade = true; break;
 
-            // Reload (single trigger)
             case 'KeyR':
                 if (!game.playerState.isReloading) {
                     game.inputBuffer.reload = true;
                 }
-                break;
-
-            case 'Enter':
-                if (game.playerState.isDead && (game.playerState.respawnTimer || 0) <= 0) {
-                    game.respawnPlayer();
-                }
-                break;
-
-            case 'KeyP':
-                const debug = document.getElementById('debug-info');
-                if (debug) debug.classList.toggle('hidden');
                 break;
         }
     });
@@ -165,7 +169,7 @@ export function initInput(game) {
 
     // MOUSE BUTTONS
     window.addEventListener('mousedown', (e) => {
-        if (!game.isStarted) return;
+        if (!game.isStarted || document.activeElement.tagName === 'INPUT') return;
         if (e.button === 0) game.inputBuffer.shoot = true;
         if (e.button === 2) game.inputBuffer.ads = true;
     });

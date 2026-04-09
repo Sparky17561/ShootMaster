@@ -6,6 +6,7 @@ const tempVec = new THREE.Vector3();
 const moveDir = new THREE.Vector3();
 
 export function updatePhysics(game, dt) {
+    if (!game.isStarted || game.playerState.isDead) return;
     const { playerState, inputBuffer } = game;
 
     // 1. Calculate direction

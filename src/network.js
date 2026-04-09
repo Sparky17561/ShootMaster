@@ -9,7 +9,7 @@ export const SERVER_URL = 'http://localhost:3001';
 let socket = null;
 let gameRef = null;
 let updateInterval = null;
-const UPDATE_RATE_MS = 100; // 10 Hz position updates
+const UPDATE_RATE_MS = 50; // 20 Hz position updates
 
 import * as worldMod from './world.js';
 
@@ -328,28 +328,29 @@ function startSendingUpdates(game) {
             rotation: game.playerState.rotation,
             currentWeapon: currentWeapon ? currentWeapon.name : 'PISTOL',
             health: game.playerState.health,
-            isAiming: !!game.inputBuffer.ads
+            isAiming: !!game.inputBuffer.ads,
+            isInvulnerable: !!game.playerState.isInvulnerable
         };
 
         if (game.networkState.isHost) {
-            // ONLY SYNC BOTS IF RELEVANT (Solo or specific host logic)
-            if (game.playerProfile.mode !== 'pvp') {
-                payload.bots = worldMod.bots.map((b, i) => ({
-                    idx: i,
-                    x: +b.position.x.toFixed(2), z: +b.position.z.toFixed(2),
-                    yaw: +b.rotation.y.toFixed(3),
-                    hp: b.userData.health,
-                    dead: b.userData.isDead,
-                    type: b.userData.botType
-                }));
-                payload.pickups = {
-                    healthKits: worldMod.healthKits.map(h => h.visible),
-                    ammoBoxes: worldMod.ammoBoxes.map(a => a.visible)
-                };
-            }
+            // Always sync pickups
+            payload.pickups = {
+                healthKits: worldMod.healthKits.map(h => h.visible),
+                ammoBoxes: worldMod.ammoBoxes.map(a => a.visible)
+            };
+
+            // SYNC BOTS (Multiplayer PvE Support)
+            payload.bots = worldMod.bots.map((b, i) => ({
+                idx: i,
+                x: +b.position.x.toFixed(2), z: +b.position.z.toFixed(2),
+                yaw: +b.rotation.y.toFixed(3),
+                hp: b.userData.health,
+                dead: b.userData.isDead,
+                type: b.userData.botType
+            }));
         }
         socket.emit('player-update', payload);
-    }, 50);
+    }, UPDATE_RATE_MS);
 }
 
 function stopSendingUpdates() {
