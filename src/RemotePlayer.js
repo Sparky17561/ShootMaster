@@ -1,10 +1,7 @@
 import * as THREE from 'three';
 import { playerHitboxes } from './world.js';
 
-/**
- * RemotePlayer — Renders another player as a colored cube with name label
- * Uses interpolation for smooth movement
- */
+
 export class RemotePlayer {
     constructor(scene, playerData) {
         this.scene = scene;
